@@ -1,7 +1,7 @@
 import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import type { MapTextures } from '../assets/AssetManifest';
 import type { Building, CityState } from '../simulation/CityState';
-import { getTileKey, getWaterCoveredTiles } from '../simulation/Simulation';
+import { getFoodCoveredTiles, getTileKey, getWaterCoveredTiles } from '../simulation/Simulation';
 import { gridToScreen, TILE_HEIGHT, TILE_WIDTH } from './GridMath';
 
 export class MapRenderer extends Container {
@@ -18,9 +18,9 @@ export class MapRenderer extends Container {
     }
 
     const terrain = new Container();
-    const water = new Container();
+    const overlays = new Container();
     const buildings = new Container();
-    this.addChild(terrain, water, buildings);
+    this.addChild(terrain, overlays, buildings);
 
     for (const tile of city.tiles) {
       terrain.addChild(this.createTileSprite(tile, this.textures[tile.terrain]));
@@ -31,9 +31,19 @@ export class MapRenderer extends Container {
       const overlay = new Graphics();
       for (const tile of city.tiles) {
         if (!coveredTiles.has(getTileKey(tile.x, tile.y))) continue;
-        this.drawWaterTile(overlay, tile.x, tile.y);
+        this.drawCoverageTile(overlay, tile.x, tile.y, 0x2f8fd8, 0.32);
       }
-      water.addChild(overlay);
+      overlays.addChild(overlay);
+    }
+
+    if (options.foodOverlay === true) {
+      const coveredTiles = getFoodCoveredTiles(city);
+      const overlay = new Graphics();
+      for (const tile of city.tiles) {
+        if (!coveredTiles.has(getTileKey(tile.x, tile.y))) continue;
+        this.drawCoverageTile(overlay, tile.x, tile.y, 0x65b84a, 0.28);
+      }
+      overlays.addChild(overlay);
     }
 
     // Draw back to front; roofs must not be covered by a neighbouring ground tile.
@@ -41,7 +51,7 @@ export class MapRenderer extends Container {
       (a.x + a.y) - (b.x + b.y) || a.x - b.x
     ));
     for (const building of renderedBuildings) {
-      buildings.addChild(this.createBuildingSprite(building));
+      buildings.addChild(this.createBuildingSprite(building, options));
     }
   }
 
@@ -59,7 +69,7 @@ export class MapRenderer extends Container {
     );
   }
 
-  private drawWaterTile(graphics: Graphics, x: number, y: number): void {
+  private drawCoverageTile(graphics: Graphics, x: number, y: number, color: number, alpha: number): void {
     const center = gridToScreen(x, y);
     graphics
       .poly([
@@ -68,13 +78,20 @@ export class MapRenderer extends Container {
         center.x, center.y + TILE_HEIGHT / 2,
         center.x - TILE_WIDTH / 2, center.y,
       ], true)
-      .fill({ color: 0x2f8fd8, alpha: 0.32 });
+      .fill({ color, alpha });
   }
 
-  private createBuildingSprite(building: Building): Sprite {
+  private createBuildingSprite(building: Building, options: MapRenderOptions): Sprite {
     const sprite = this.createTileSprite(building, this.textures[building.type]);
-    if (building.type === 'house' && (building.level ?? 1) >= 2) {
-      sprite.tint = 0xffe2a0;
+    if (building.type === 'house') {
+      const level = building.level ?? 1;
+      if (options.foodOverlay === true && building.hasFood !== true) {
+        sprite.tint = 0xd8792f;
+      } else if (level >= 3) {
+        sprite.tint = 0xb9e36f;
+      } else if (level >= 2) {
+        sprite.tint = 0xffe2a0;
+      }
     }
     return sprite;
   }
@@ -97,4 +114,5 @@ interface TilePosition {
 
 interface MapRenderOptions {
   readonly waterOverlay?: boolean;
+  readonly foodOverlay?: boolean;
 }

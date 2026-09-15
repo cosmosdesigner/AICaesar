@@ -7,6 +7,9 @@ export const BUILD_COSTS: Readonly<Record<BuildingType, number>> = {
   road: 4,
   house: 20,
   well: 35,
+  farm: 45,
+  granary: 60,
+  market: 50,
 };
 
 export interface Building {
@@ -17,11 +20,14 @@ export interface Building {
   level?: number;
   hasRoadAccess?: boolean;
   hasWater?: boolean;
+  hasFood?: boolean;
   upgradeProgress?: number;
+  storedFood?: number;
 }
 
 export interface ResourceState {
   money: number;
+  food: number;
 }
 
 export interface SimulationState {
@@ -51,7 +57,7 @@ export function createCityState(): CityState {
     height: MAP_HEIGHT,
     tiles,
     buildings: [],
-    resources: { money: INITIAL_MONEY },
+    resources: { money: INITIAL_MONEY, food: 0 },
     simulation: { tick: 0 },
   };
 
@@ -107,8 +113,24 @@ function addBuilding(city: CityState, x: number, y: number, type: BuildingType):
   if (!tile) return;
 
   const building: Building = type === 'house'
-    ? { id: `${type}-${x}-${y}`, type, x, y, level: 1, hasRoadAccess: false, hasWater: false, upgradeProgress: 0 }
-    : { id: `${type}-${x}-${y}`, type, x, y };
+    ? {
+        id: `${type}-${x}-${y}`,
+        type,
+        x,
+        y,
+        level: 1,
+        hasRoadAccess: false,
+        hasWater: false,
+        hasFood: false,
+        upgradeProgress: 0,
+      }
+    : {
+        id: `${type}-${x}-${y}`,
+        type,
+        x,
+        y,
+        ...(type === 'granary' ? { storedFood: 0 } : {}),
+      };
   tile.buildingId = building.id;
   city.buildings.push(building);
 }
