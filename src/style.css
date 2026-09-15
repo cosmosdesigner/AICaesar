@@ -28,6 +28,12 @@ main { padding: 0 16px; }
   font-size: 14px;
 }
 .build-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.build-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: #a8b5ab;
+}
 button {
   font: inherit;
   color: inherit;

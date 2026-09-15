@@ -4,21 +4,32 @@ import { screenToGrid } from '../rendering/GridMath';
 import { MapRenderer } from '../rendering/MapRenderer';
 import { createPixiApp } from '../rendering/PixiApp';
 import { createCityState, placeBuilding, type BuildResult } from '../simulation/CityState';
+import { simulateTick } from '../simulation/Simulation';
 import { BuildPanel, BUILD_LABELS } from '../ui/BuildPanel';
 
 export async function startGame(host: HTMLElement, panelHost: HTMLElement): Promise<() => void> {
   let city = createCityState();
+  let waterOverlay = false;
   const textures = await loadMapTextures();
   const app = await createPixiApp(host);
   const map = new MapRenderer(city, textures);
   app.stage.addChild(map);
-  const panel = new BuildPanel(panelHost, () => {
-    city = createCityState();
-    map.refresh(city);
-    resize();
-    panel.update(city.resources, 'Cidade e dinheiro inicial restaurados.');
-  });
-  panel.update(city.resources, 'Clique num tile vazio para construir.');
+  const panel = new BuildPanel(
+    panelHost,
+    () => {
+      city = createCityState();
+      map.refresh(city, { waterOverlay });
+      resize();
+      panel.update(city, 'Cidade, dinheiro e simulação inicial restaurados.', waterOverlay);
+    },
+    () => {
+      waterOverlay = !waterOverlay;
+      map.refresh(city, { waterOverlay });
+      app.render();
+      return waterOverlay;
+    },
+  );
+  panel.update(city, 'Clique num tile vazio para construir.', waterOverlay);
 
   const messages: Record<Exclude<BuildResult, 'built'>, string> = {
     'outside-map': 'Construa dentro do mapa.',
@@ -35,12 +46,12 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     const tile = screenToGrid(local.x, local.y);
     const result = tile ? placeBuilding(city, tile.x, tile.y, panel.selectedTool) : 'outside-map';
     if (result === 'built') {
-      map.refresh(city);
+      map.refresh(city, { waterOverlay });
       resize();
     }
-    panel.update(city.resources, result === 'built'
+    panel.update(city, result === 'built'
       ? `${BUILD_LABELS[panel.selectedTool]} construído.`
-      : messages[result]);
+      : messages[result], waterOverlay);
   });
 
   const resize = (): void => {
@@ -52,8 +63,15 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   observer.observe(host);
   resize();
 
-  // No simulation loop: render only on setup, resize, construction and reset.
+  const tickHandle = window.setInterval(() => {
+    simulateTick(city);
+    map.refresh(city, { waterOverlay });
+    panel.update(city, 'Simulação atualizada.', waterOverlay);
+    app.render();
+  }, 1000);
+
   return () => {
+    window.clearInterval(tickHandle);
     observer.disconnect();
     panel.destroy();
     app.destroy(true, { children: true });

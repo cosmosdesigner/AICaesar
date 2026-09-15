@@ -14,10 +14,18 @@ export interface Building {
   readonly type: BuildingType;
   readonly x: number;
   readonly y: number;
+  level?: number;
+  hasRoadAccess?: boolean;
+  hasWater?: boolean;
+  upgradeProgress?: number;
 }
 
 export interface ResourceState {
   money: number;
+}
+
+export interface SimulationState {
+  tick: number;
 }
 
 export interface CityState {
@@ -26,6 +34,7 @@ export interface CityState {
   readonly tiles: readonly Tile[];
   readonly buildings: Building[];
   readonly resources: ResourceState;
+  readonly simulation: SimulationState;
 }
 
 export function createCityState(): CityState {
@@ -43,6 +52,7 @@ export function createCityState(): CityState {
     tiles,
     buildings: [],
     resources: { money: INITIAL_MONEY },
+    simulation: { tick: 0 },
   };
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
@@ -96,7 +106,9 @@ function addBuilding(city: CityState, x: number, y: number, type: BuildingType):
   const tile = getTile(city, x, y);
   if (!tile) return;
 
-  const building: Building = { id: `${type}-${x}-${y}`, type, x, y };
+  const building: Building = type === 'house'
+    ? { id: `${type}-${x}-${y}`, type, x, y, level: 1, hasRoadAccess: false, hasWater: false, upgradeProgress: 0 }
+    : { id: `${type}-${x}-${y}`, type, x, y };
   tile.buildingId = building.id;
   city.buildings.push(building);
 }

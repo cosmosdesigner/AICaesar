@@ -1,6 +1,7 @@
-import { Container, Sprite, type Texture } from 'pixi.js';
+import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import type { MapTextures } from '../assets/AssetManifest';
-import type { CityState } from '../simulation/CityState';
+import type { Building, CityState } from '../simulation/CityState';
+import { getTileKey, getWaterCoveredTiles } from '../simulation/Simulation';
 import { gridToScreen, TILE_HEIGHT, TILE_WIDTH } from './GridMath';
 
 export class MapRenderer extends Container {
@@ -10,18 +11,29 @@ export class MapRenderer extends Container {
     this.refresh(city);
   }
 
-  refresh(city: CityState): void {
+  refresh(city: CityState, options: MapRenderOptions = {}): void {
     // Destroy old display objects, but retain the shared asset textures.
     for (const child of this.removeChildren()) {
       child.destroy({ children: true });
     }
 
     const terrain = new Container();
+    const water = new Container();
     const buildings = new Container();
-    this.addChild(terrain, buildings);
+    this.addChild(terrain, water, buildings);
 
     for (const tile of city.tiles) {
       terrain.addChild(this.createTileSprite(tile, this.textures[tile.terrain]));
+    }
+
+    if (options.waterOverlay === true) {
+      const coveredTiles = getWaterCoveredTiles(city);
+      const overlay = new Graphics();
+      for (const tile of city.tiles) {
+        if (!coveredTiles.has(getTileKey(tile.x, tile.y))) continue;
+        this.drawWaterTile(overlay, tile.x, tile.y);
+      }
+      water.addChild(overlay);
     }
 
     // Draw back to front; roofs must not be covered by a neighbouring ground tile.
@@ -29,7 +41,7 @@ export class MapRenderer extends Container {
       (a.x + a.y) - (b.x + b.y) || a.x - b.x
     ));
     for (const building of renderedBuildings) {
-      buildings.addChild(this.createTileSprite(building, this.textures[building.type]));
+      buildings.addChild(this.createBuildingSprite(building));
     }
   }
 
@@ -47,6 +59,26 @@ export class MapRenderer extends Container {
     );
   }
 
+  private drawWaterTile(graphics: Graphics, x: number, y: number): void {
+    const center = gridToScreen(x, y);
+    graphics
+      .poly([
+        center.x, center.y - TILE_HEIGHT / 2,
+        center.x + TILE_WIDTH / 2, center.y,
+        center.x, center.y + TILE_HEIGHT / 2,
+        center.x - TILE_WIDTH / 2, center.y,
+      ], true)
+      .fill({ color: 0x2f8fd8, alpha: 0.32 });
+  }
+
+  private createBuildingSprite(building: Building): Sprite {
+    const sprite = this.createTileSprite(building, this.textures[building.type]);
+    if (building.type === 'house' && (building.level ?? 1) >= 2) {
+      sprite.tint = 0xffe2a0;
+    }
+    return sprite;
+  }
+
   private createTileSprite(position: TilePosition, texture: Texture): Sprite {
     const sprite = new Sprite(texture);
     const screenPosition = gridToScreen(position.x, position.y);
@@ -61,4 +93,8 @@ export class MapRenderer extends Container {
 interface TilePosition {
   readonly x: number;
   readonly y: number;
+}
+
+interface MapRenderOptions {
+  readonly waterOverlay?: boolean;
 }
