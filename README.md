@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 2 — construção manual**: mapa isométrico 30×30, em TypeScript + Vite + PixiJS, sem React.
+**Fase 3 — estado consolidado da cidade**: mapa isométrico 30×30, construção manual e modelo separado de tiles, edifícios e recursos, em TypeScript + Vite + PixiJS, sem React.
 
 ## Executar localmente
 
@@ -29,12 +29,13 @@ npm run preview
 
 ## Construção manual
 
-- Dinheiro inicial: **500**, além da cidade seedada (os edifícios iniciais não são cobrados).
+- Dinheiro inicial: **500** em `resources.money`, além da cidade seedada (os edifícios iniciais não são cobrados).
 - Selecionar **Road (4)**, **House (20)** ou **Well (35)** no painel; Road começa selecionada.
 - Clicar com o botão principal num tile vazio para construir. O dinheiro diminui pelo custo indicado.
+- Cada construção cria um `Building { id, type, x, y }`; o tile guarda apenas `buildingId`.
 - O painel mostra dinheiro, ferramenta selecionada e feedback da última ação.
 - Tiles ocupados, coordenadas fora do mapa e dinheiro insuficiente são rejeitados sem alterar cidade ou saldo.
-- **Reset** restaura a cidade seedada e os 500 iniciais; mantém a ferramenta selecionada.
+- **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money` e os edifícios iniciais; mantém a ferramenta selecionada.
 
 O mapa completo é redesenhado após construção válida ou reset; também é enquadrado ao redimensionar. Não há loop de simulação, pan/zoom, demolição, água/comida/workers, farms/granaries/markets, walkers/pathfinding, backend ou advisor/IA.
 
@@ -49,15 +50,15 @@ src/
   rendering/PixiApp.ts       Canvas PixiJS
   rendering/MapRenderer.ts   Camadas, profundidade, refresh e enquadramento
   rendering/GridMath.ts      Conversão isométrica nos dois sentidos
-  simulation/CityState.ts    Estado, seed, dinheiro, custos e validação de construção
-  simulation/Tile.ts         Coordenadas, terreno e tipo de edifício
-  ui/BuildPanel.ts           Painel HTML: ferramentas, dinheiro, feedback e reset
+  simulation/CityState.ts    Estado, seed, buildings[], resources, custos e validação de construção
+  simulation/Tile.ts         Coordenadas, terreno e referência buildingId opcional
+  ui/BuildPanel.ts           Painel HTML: ferramentas, custos, dinheiro, feedback e reset
   main.ts                   Arranque e mensagem de erro de carregamento
   style.css                 Layout da página
 public/assets/prototype/    Apenas quatro PNGs e aviso de licenciamento
 ```
 
-`gridToScreen` devolve o centro do losango em coordenadas locais do mapa, usando tiles de 120×60. `screenToGrid` recebe essas mesmas coordenadas locais, devolve o tile mais próximo e retorna `null` para valores não finitos. O input usa `map.toLocal(event.global)` antes da conversão; `build` em `CityState` valida coordenadas inteiras e limites, ocupação e saldo antes de qualquer mutação. `INITIAL_MONEY` e `BUILD_COSTS` nesse ficheiro configuram a economia. O renderer deriva dos tiles; refresh destrói os objetos visuais antigos sem destruir as texturas partilhadas.
+`gridToScreen` devolve o centro do losango em coordenadas locais do mapa, usando tiles de 120×60. `screenToGrid` recebe essas mesmas coordenadas locais, devolve o tile mais próximo e retorna `null` para valores não finitos. O input usa `map.toLocal(event.global)` antes da conversão; `placeBuilding` em `CityState` valida coordenadas inteiras e limites, ocupação por `buildingId` e saldo em `resources.money` antes de qualquer mutação. `INITIAL_MONEY` e `BUILD_COSTS` nesse ficheiro configuram a economia. O renderer deriva terreno de `city.tiles` e edifícios de `city.buildings`; refresh destrói os objetos visuais antigos sem destruir as texturas partilhadas.
 
 ## Assets e documentação
 
@@ -67,8 +68,7 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 
 - [Plano da Fase 1](documentation/phase-1-development-plan.md)
 - [Plano da Fase 2](documentation/phase-2-development-plan.md)
+- [Plano da Fase 3](documentation/phase-3-development-plan.md)
 - [MVP](documentation/mvp.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)
-
-Próximo escopo planeado: Fase 3, consolidação do modelo de cidade, edifícios e recursos. Não está implementado aqui.

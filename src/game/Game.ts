@@ -3,7 +3,7 @@ import { loadMapTextures } from '../assets/AssetManifest';
 import { screenToGrid } from '../rendering/GridMath';
 import { MapRenderer } from '../rendering/MapRenderer';
 import { createPixiApp } from '../rendering/PixiApp';
-import { build, createCityState, type BuildResult } from '../simulation/CityState';
+import { createCityState, placeBuilding, type BuildResult } from '../simulation/CityState';
 import { BuildPanel, BUILD_LABELS } from '../ui/BuildPanel';
 
 export async function startGame(host: HTMLElement, panelHost: HTMLElement): Promise<() => void> {
@@ -16,9 +16,9 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     city = createCityState();
     map.refresh(city);
     resize();
-    panel.update(city.money, 'Cidade e dinheiro inicial restaurados.');
+    panel.update(city.resources, 'Cidade e dinheiro inicial restaurados.');
   });
-  panel.update(city.money, 'Clique num tile vazio para construir.');
+  panel.update(city.resources, 'Clique num tile vazio para construir.');
 
   const messages: Record<Exclude<BuildResult, 'built'>, string> = {
     'outside-map': 'Construa dentro do mapa.',
@@ -33,12 +33,12 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     if (event.button !== 0) return;
     map.toLocal(event.global, undefined, local);
     const tile = screenToGrid(local.x, local.y);
-    const result = tile ? build(city, tile.x, tile.y, panel.selectedTool) : 'outside-map';
+    const result = tile ? placeBuilding(city, tile.x, tile.y, panel.selectedTool) : 'outside-map';
     if (result === 'built') {
       map.refresh(city);
       resize();
     }
-    panel.update(city.money, result === 'built'
+    panel.update(city.resources, result === 'built'
       ? `${BUILD_LABELS[panel.selectedTool]} construído.`
       : messages[result]);
   });

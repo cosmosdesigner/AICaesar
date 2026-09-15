@@ -1,4 +1,4 @@
-import { BUILD_COSTS } from '../simulation/CityState';
+import { BUILD_COSTS, type ResourceState } from '../simulation/CityState';
 import type { BuildingType } from '../simulation/Tile';
 
 export const BUILD_LABELS: Readonly<Record<BuildingType, string>> = {
@@ -52,8 +52,8 @@ export class BuildPanel {
     host.append(this.element);
   }
 
-  update(money: number, message: string): void {
-    this.money.textContent = String(money);
+  update(resources: ResourceState, message: string): void {
+    this.money.textContent = String(resources.money);
     this.status.textContent = message;
   }
 
