@@ -3,9 +3,10 @@ import './style.css';
 
 const host = document.querySelector<HTMLElement>('#map');
 const status = document.querySelector<HTMLElement>('#status');
-if (!host || !status) throw new Error('Missing map host or status element.');
+const panelHost = document.querySelector<HTMLElement>('#build-panel');
+if (!host || !status || !panelHost) throw new Error('Missing map host, status or build panel element.');
 
-const startup = startGame(host);
+const startup = startGame(host, panelHost);
 startup.then(() => {
   status.hidden = true;
 }).catch((error: unknown) => {

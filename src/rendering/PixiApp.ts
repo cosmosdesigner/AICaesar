@@ -13,7 +13,7 @@ export async function createPixiApp(host: HTMLElement): Promise<Application> {
     autoStart: false,
   });
   app.canvas.setAttribute('role', 'img');
-  app.canvas.setAttribute('aria-label', 'Mapa 30 por 30 com relva, estrada, seis casas e um poço.');
+  app.canvas.setAttribute('aria-label', 'Mapa 30 por 30. Selecione Road, House ou Well e clique num tile vazio para construir.');
   host.append(app.canvas);
   return app;
 }

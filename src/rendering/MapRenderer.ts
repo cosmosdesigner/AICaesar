@@ -5,16 +5,24 @@ import type { Tile } from '../simulation/Tile';
 import { gridToScreen, TILE_HEIGHT, TILE_WIDTH } from './GridMath';
 
 export class MapRenderer extends Container {
-  constructor(city: CityState, textures: MapTextures) {
+  constructor(city: CityState, private readonly textures: MapTextures) {
     super();
     this.eventMode = 'none';
+    this.refresh(city);
+  }
+
+  refresh(city: CityState): void {
+    // Destroy old display objects, but retain the shared asset textures.
+    for (const child of this.removeChildren()) {
+      child.destroy({ children: true });
+    }
 
     const terrain = new Container();
     const buildings = new Container();
     this.addChild(terrain, buildings);
 
     for (const tile of city.tiles) {
-      terrain.addChild(this.createTileSprite(tile, textures[tile.terrain]));
+      terrain.addChild(this.createTileSprite(tile, this.textures[tile.terrain]));
     }
 
     // Draw back to front; roofs must not be covered by a neighbouring ground tile.
@@ -22,7 +30,7 @@ export class MapRenderer extends Container {
     occupied.sort((a, b) => (a.x + a.y) - (b.x + b.y) || a.x - b.x);
     for (const tile of occupied) {
       if (tile.building) {
-        buildings.addChild(this.createTileSprite(tile, textures[tile.building]));
+        buildings.addChild(this.createTileSprite(tile, this.textures[tile.building]));
       }
     }
   }

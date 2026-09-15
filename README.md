@@ -1,6 +1,6 @@
 # AICaesar
 
-Base visual da **Fase 1**: mapa isométrico 30×30, em TypeScript + Vite + PixiJS, sem React.
+**Fase 2 — construção manual**: mapa isométrico 30×30, em TypeScript + Vite + PixiJS, sem React.
 
 ## Executar localmente
 
@@ -27,27 +27,37 @@ npm run preview
 - Sprites reais da Caesaria, alinhados pela base do tile e ordenados de trás para a frente.
 - Enquadramento automático de todo o mapa ao abrir ou redimensionar a janela.
 
-A cena é estática: sem colocação de edifícios, pan/zoom, dinheiro, simulação de água/comida/workers, pathfinding ou advisor/IA. Só há renderização na inicialização e no redimensionamento, sem loop de simulação.
+## Construção manual
+
+- Dinheiro inicial: **500**, além da cidade seedada (os edifícios iniciais não são cobrados).
+- Selecionar **Road (4)**, **House (20)** ou **Well (35)** no painel; Road começa selecionada.
+- Clicar com o botão principal num tile vazio para construir. O dinheiro diminui pelo custo indicado.
+- O painel mostra dinheiro, ferramenta selecionada e feedback da última ação.
+- Tiles ocupados, coordenadas fora do mapa e dinheiro insuficiente são rejeitados sem alterar cidade ou saldo.
+- **Reset** restaura a cidade seedada e os 500 iniciais; mantém a ferramenta selecionada.
+
+O mapa completo é redesenhado após construção válida ou reset; também é enquadrado ao redimensionar. Não há loop de simulação, pan/zoom, demolição, água/comida/workers, farms/granaries/markets, walkers/pathfinding, backend ou advisor/IA.
+
+Verificação manual: construir Road num tile vazio (saldo 496), selecionar House e clicar no mesmo tile (erro, saldo 496), construir House noutro tile (476) e Well noutro (441). Clicar fora do mapa não deve gastar dinheiro. Após Reset, construir 14 Wells em tiles vazios deixa saldo 10; mais um Well deve ser rejeitado sem ocupar o tile. Reset deve restaurar os edifícios iniciais e saldo 500.
 
 ## Estrutura
 
 ```text
 src/
   assets/AssetManifest.ts    URLs locais e carregamento das quatro texturas
-  game/Game.ts              Inicialização, resize e libertação do renderer
+  game/Game.ts              Input PixiJS, construção, reset, resize e libertação
   rendering/PixiApp.ts       Canvas PixiJS
-  rendering/MapRenderer.ts   Camadas, alinhamento, profundidade e enquadramento
+  rendering/MapRenderer.ts   Camadas, profundidade, refresh e enquadramento
   rendering/GridMath.ts      Conversão isométrica nos dois sentidos
-  simulation/CityState.ts    Estado e seed 30×30, sem dependência de PixiJS
+  simulation/CityState.ts    Estado, seed, dinheiro, custos e validação de construção
   simulation/Tile.ts         Coordenadas, terreno e tipo de edifício
-  input/                    Reservado para a Fase 2; sem implementação
-  ui/                       Reservado para fases seguintes; sem implementação
+  ui/BuildPanel.ts           Painel HTML: ferramentas, dinheiro, feedback e reset
   main.ts                   Arranque e mensagem de erro de carregamento
   style.css                 Layout da página
 public/assets/prototype/    Apenas quatro PNGs e aviso de licenciamento
 ```
 
-`gridToScreen` devolve o centro do losango em coordenadas locais do mapa, usando tiles de 120×60. `screenToGrid` recebe essas mesmas coordenadas locais, devolve o tile mais próximo e retorna `null` para valores não finitos. Não aplica limites do mapa: um futuro consumidor deve primeiro desfazer a transformação do container e depois verificar os limites do `CityState`. Não existe input de construção nesta fase.
+`gridToScreen` devolve o centro do losango em coordenadas locais do mapa, usando tiles de 120×60. `screenToGrid` recebe essas mesmas coordenadas locais, devolve o tile mais próximo e retorna `null` para valores não finitos. O input usa `map.toLocal(event.global)` antes da conversão; `build` em `CityState` valida coordenadas inteiras e limites, ocupação e saldo antes de qualquer mutação. `INITIAL_MONEY` e `BUILD_COSTS` nesse ficheiro configuram a economia. O renderer deriva dos tiles; refresh destrói os objetos visuais antigos sem destruir as texturas partilhadas.
 
 ## Assets e documentação
 
@@ -56,8 +66,9 @@ public/assets/prototype/    Apenas quatro PNGs e aviso de licenciamento
 A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na fonte contém indicadores de percurso. Só os quatro PNGs usados foram copiados, sem modificar os originais.
 
 - [Plano da Fase 1](documentation/phase-1-development-plan.md)
+- [Plano da Fase 2](documentation/phase-2-development-plan.md)
 - [MVP](documentation/mvp.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)
 
-Próximo escopo planeado: Fase 2, construção manual. Não está implementado aqui.
+Próximo escopo planeado: Fase 3, consolidação do modelo de cidade, edifícios e recursos. Não está implementado aqui.

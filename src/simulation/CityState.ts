@@ -2,11 +2,18 @@ import type { BuildingType, Tile } from './Tile';
 
 export const MAP_WIDTH = 30;
 export const MAP_HEIGHT = 30;
+export const INITIAL_MONEY = 500;
+export const BUILD_COSTS: Readonly<Record<BuildingType, number>> = {
+  road: 4,
+  house: 20,
+  well: 35,
+};
 
 export interface CityState {
   readonly width: number;
   readonly height: number;
   readonly tiles: readonly Tile[];
+  money: number;
 }
 
 export function createCityState(): CityState {
@@ -27,5 +34,25 @@ export function createCityState(): CityState {
     }
   }
 
-  return { width: MAP_WIDTH, height: MAP_HEIGHT, tiles };
+  return { width: MAP_WIDTH, height: MAP_HEIGHT, tiles, money: INITIAL_MONEY };
+}
+
+export type BuildResult = 'built' | 'outside-map' | 'occupied' | 'insufficient-funds';
+
+export function build(city: CityState, x: number, y: number, tool: BuildingType): BuildResult {
+  if (!Number.isInteger(x) || !Number.isInteger(y)
+    || x < 0 || y < 0 || x >= city.width || y >= city.height) {
+    return 'outside-map';
+  }
+
+  const tile = city.tiles[y * city.width + x];
+  if (!tile) return 'outside-map';
+  if (tile.building !== undefined) return 'occupied';
+
+  const cost = BUILD_COSTS[tool];
+  if (city.money < cost) return 'insufficient-funds';
+
+  tile.building = tool;
+  city.money -= cost;
+  return 'built';
 }
