@@ -1,6 +1,15 @@
 import { createAdvisorPlan, type AdvisorPlan } from '../advisor/MockAdvisor';
 import type { CityState } from '../simulation/CityState';
 
+export interface AdvisorApprovalResult {
+  readonly ok: boolean;
+  readonly message: string;
+}
+
+export interface AdvisorPanelOptions {
+  readonly onApprovePlan?: (plan: AdvisorPlan) => AdvisorApprovalResult;
+}
+
 export class AdvisorPanel {
   private plan: AdvisorPlan | undefined;
   private readonly element = document.createElement('section');
@@ -13,7 +22,11 @@ export class AdvisorPanel {
   private readonly controls = document.createElement('div');
   private readonly status = document.createElement('p');
 
-  constructor(host: HTMLElement, private readonly getCity: () => CityState) {
+  constructor(
+    host: HTMLElement,
+    private readonly getCity: () => CityState,
+    private readonly options: AdvisorPanelOptions = {},
+  ) {
     this.element.className = 'advisor-panel';
     this.element.setAttribute('aria-label', 'Advisor');
 
@@ -33,7 +46,22 @@ export class AdvisorPanel {
     approve.type = 'button';
     approve.textContent = 'Approve';
     approve.addEventListener('click', () => {
-      this.status.textContent = 'Plan approved for future execution. Execution is not implemented yet.';
+      if (this.plan === undefined) {
+        this.status.textContent = 'No advisor plan to approve.';
+        return;
+      }
+
+      const result = this.options.onApprovePlan?.(this.plan);
+      if (result === undefined) {
+        this.status.textContent = 'No advisor executor configured.';
+        return;
+      }
+
+      this.status.textContent = result.message;
+      if (result.ok) {
+        this.plan = undefined;
+        this.renderPlan();
+      }
     });
 
     const reject = document.createElement('button');

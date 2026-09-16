@@ -1,4 +1,5 @@
 import { type FederatedPointerEvent, Point } from 'pixi.js';
+import { executePlan } from '../actions/ActionExecutor';
 import { loadMapTextures } from '../assets/AssetManifest';
 import { screenToGrid } from '../rendering/GridMath';
 import { MapRenderer } from '../rendering/MapRenderer';
@@ -22,9 +23,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     () => {
       city = createCityState();
       assignWorkers(city);
-      map.refresh(city, { waterOverlay, foodOverlay });
-      resize();
-      panel.update(city, 'Cidade, dinheiro e simulação inicial restaurados.', waterOverlay, foodOverlay);
+      refreshCity('Cidade, dinheiro e simulação inicial restaurados.');
     },
     () => {
       waterOverlay = !waterOverlay;
@@ -39,7 +38,13 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       return foodOverlay;
     },
   );
-  const advisor = new AdvisorPanel(panelHost, () => city);
+  const advisor = new AdvisorPanel(panelHost, () => city, {
+    onApprovePlan: (plan) => {
+      const result = executePlan(city, plan, plan.estimatedCost);
+      if (result.ok) refreshCity(result.message);
+      return { ok: result.ok, message: result.message };
+    },
+  });
   panel.update(city, 'Clique num tile vazio para construir.', waterOverlay, foodOverlay);
 
   const messages: Record<Exclude<BuildResult, 'built'>, string> = {
@@ -58,12 +63,11 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     const result = tile ? placeBuilding(city, tile.x, tile.y, panel.selectedTool) : 'outside-map';
     if (result === 'built') {
       assignWorkers(city);
-      map.refresh(city, { waterOverlay, foodOverlay });
-      resize();
+      refreshCity(`${BUILD_LABELS[panel.selectedTool]} construído.`);
+      return;
     }
-    panel.update(city, result === 'built'
-      ? `${BUILD_LABELS[panel.selectedTool]} construído.`
-      : messages[result], waterOverlay, foodOverlay);
+
+    panel.update(city, messages[result], waterOverlay, foodOverlay);
   });
 
   const resize = (): void => {
@@ -71,6 +75,13 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     map.fit(app.screen.width, app.screen.height);
     app.render();
   };
+
+  function refreshCity(message: string): void {
+    map.refresh(city, { waterOverlay, foodOverlay });
+    resize();
+    panel.update(city, message, waterOverlay, foodOverlay);
+    app.render();
+  }
   const observer = new ResizeObserver(resize);
   observer.observe(host);
   resize();

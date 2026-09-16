@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 8 — advisor mock determinístico**: mapa isométrico 30×30, construção manual, modelo separado de estado da cidade, simulação simples por tick, análise determinística de problemas urbanos e advisor mock que transforma issues em planos legíveis sem LLM, execução automática ou mutação da cidade.
+**Fase 9 — validação e execução segura do advisor**: mapa isométrico 30×30, construção manual, modelo separado de estado da cidade, simulação simples por tick, análise determinística de problemas urbanos, advisor mock sem LLM e execução transacional simples de planos aprovados.
 
 ## Executar localmente
 
@@ -19,7 +19,7 @@ npm test
 npm run preview
 ```
 
-`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa os testes unitários Vitest do analyzer e do advisor mock; `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui os assets temporários e não deve ser publicado.**
+`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa os testes unitários Vitest do analyzer, do advisor mock e do executor de ações; `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui os assets temporários e não deve ser publicado.**
 
 ## O que aparece
 
@@ -34,7 +34,7 @@ npm run preview
 - Overlays opcionais de água e comida, desenhados sem novos sprites, mostram cobertura de poços e markets ativos; no overlay de comida, casas sem comida recebem tint laranja.
 - O analyzer determinístico resume tick, dinheiro, casas, água, comida e emprego, e gera issues ordenadas por severidade, tipo estável e número de tiles afetados.
 - O painel mostra os 3 principais problemas detetados, incluindo falta de água/comida, falta de produção/distribuição de comida, falta de trabalhadores, edifícios económicos sem estrada e dinheiro baixo; sem issues, mostra que não há problemas críticos.
-- O painel Advisor tem botão **Analyze city**; gera um `AdvisorPlan` determinístico com resumo do principal problema, raciocínio, ações mock, custo estimado, impactos esperados e riscos. **Approve** só reporta execução futura não implementada e não altera a cidade; **Reject** limpa o plano.
+- O painel Advisor tem botão **Analyze city**; gera um `AdvisorPlan` determinístico com resumo do principal problema, raciocínio, ações, custo estimado, impactos esperados e riscos. **Approve** valida orçamento aprovado, dinheiro, tipo, target, limites do mapa, ocupação e custo antes de executar builds via `placeBuilding`; **wait** é no-op válido; **Reject** limpa o plano.
 - Sprites reais da Caesaria, alinhados pela base do tile e ordenados de trás para a frente; casas nível 2 recebem tint clara e nível 3 tint verde.
 - Enquadramento automático de todo o mapa ao abrir ou redimensionar a janela.
 
@@ -48,15 +48,21 @@ npm run preview
 - Tiles ocupados, coordenadas fora do mapa e dinheiro insuficiente são rejeitados sem alterar cidade, saldo ou comida.
 - **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `resources.food`, `simulation.tick`, edifícios iniciais e estado ativo/inativo recalculado; mantém a ferramenta selecionada e os estados dos overlays.
 
-O mapa completo é redesenhado após construção válida, reset, tick de simulação, toggle de overlay ou redimensionamento. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Não há pan/zoom, demolição, walkers/pathfinding, commute, salários, impostos, migração, desirability, múltiplos tipos de comida, backend, LLM, validação/execução real de ações do advisor ou persistência de recomendações.
+O mapa completo é redesenhado após construção válida, execução válida do advisor, reset, tick de simulação, toggle de overlay ou redimensionamento. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Não há pan/zoom, demolição, walkers/pathfinding, commute, salários, impostos, migração, desirability, múltiplos tipos de comida, backend, LLM, rollback histórico, execução parcial silenciosa ou persistência de recomendações.
 
 Verificação manual: construir Road num tile vazio (saldo 496), selecionar House e clicar no mesmo tile (erro, saldo 496), construir Farm, Granary e Market em tiles vazios. Com poucas casas e workplaces demais, alguns workplaces ficam inativos; farms inativas não aumentam comida, granaries inativas não aumentam capacidade e markets inativos não dão cobertura de comida. Reset deve restaurar saldo 500, comida 0, tick 0 e a cidade seedada.
+
+## Advisor e execução de ações
+
+`validatePlan(city, plan, approvedBudget)` e `executePlan(city, plan, approvedBudget)` vivem em `src/actions/`. O validator rejeita planos sem ações, tipos não suportados, targets ausentes, coordenadas fora do mapa, tiles ocupados, custo manipulado, orçamento insuficiente e dinheiro insuficiente sem mutar a cidade. O executor só muta depois de validar o plano completo; ações `build_*` são mapeadas para edifícios existentes e `wait` não altera dinheiro, tiles ou simulação.
 
 ## Estrutura
 
 ```text
 src/
   advisor/MockAdvisor.ts     Advisor mock determinístico: issues do analyzer para plano estruturado
+  actions/ActionValidator.ts Validator puro de AdvisorPlan sem mutar a cidade
+  actions/ActionExecutor.ts  Executor transacional simples: valida, constrói e recalcula trabalhadores
   analysis/CityAnalyzer.ts   Summary determinístico e issues ordenadas da cidade
   assets/AssetManifest.ts    URLs locais e carregamento das sete texturas
   game/Game.ts              Input PixiJS, construção, reset, loop de tick, resize e libertação
@@ -67,7 +73,7 @@ src/
   simulation/Simulation.ts   Tick, água, comida ativa, emprego, acesso a estrada, evolução e estatísticas
   simulation/Tile.ts         Coordenadas, terreno e referência buildingId opcional
   ui/BuildPanel.ts           Painel HTML: ferramentas, custos, dinheiro, stats, top 3 issues, overlays, feedback e reset
-  ui/AdvisorPanel.ts         Painel HTML do advisor: Analyze city, plano, Approve sem execução e Reject
+  ui/AdvisorPanel.ts         Painel HTML do advisor: Analyze city, plano, Approve executa via callback e Reject limpa
   main.ts                   Arranque e mensagem de erro de carregamento
   style.css                 Layout da página
 public/assets/prototype/    Apenas sete PNGs e aviso de licenciamento
