@@ -2,12 +2,12 @@ import type { Building, CityState } from '../simulation/CityState';
 import {
   getFoodCoveredTiles,
   getFoodStats,
+  getHouseServices,
   getHousingStats,
-  getTileKey,
-  getWaterCoveredTiles,
   getWorkforceStats,
   hasAdjacentRoad,
 } from '../simulation/Simulation';
+import { getHouseStatus } from '../simulation/HouseSpecification';
 
 export type CityIssueType =
   | 'water_shortage'
@@ -64,17 +64,13 @@ export function summarizeCity(city: CityState): CityStateSummary {
   const housingStats = getHousingStats(city);
   const foodStats = getFoodStats(city);
   const workforceStats = getWorkforceStats(city);
-  const waterCoveredTiles = getWaterCoveredTiles(city);
-  const roadAndWaterHouses = getSortedBuildings(city, 'house')
-    .filter((building) => hasAdjacentRoad(city, building)
-      && waterCoveredTiles.has(getTileKey(building.x, building.y)));
 
   return {
     tick: city.simulation.tick,
     money: city.resources.money,
     houses: housingStats.totalHouses,
     housesWithoutWater: getHousesWithoutWater(city).length,
-    housesWithoutFood: roadAndWaterHouses.filter((building) => building.hasFood !== true).length,
+    housesWithoutFood: getHousesWithoutFood(city).length,
     foodStored: foodStats.foodStored,
     foodCapacity: foodStats.foodCapacity,
     farms: foodStats.farms,
@@ -178,18 +174,19 @@ export function analyzeCity(city: CityState): CityIssue[] {
 }
 
 function getHousesWithoutWater(city: CityState): Building[] {
-  const waterCoveredTiles = getWaterCoveredTiles(city);
   return getSortedBuildings(city, 'house')
-    .filter((building) => hasAdjacentRoad(city, building)
-      && !waterCoveredTiles.has(getTileKey(building.x, building.y)));
+    .filter((building) => {
+      const status = getHouseStatus(building.level, getHouseServices(city, building));
+      return status.missingForCurrentLevel === 'water' || status.missingForNextLevel === 'water';
+    });
 }
 
 function getHousesWithoutFood(city: CityState): Building[] {
-  const waterCoveredTiles = getWaterCoveredTiles(city);
   return getSortedBuildings(city, 'house')
-    .filter((building) => hasAdjacentRoad(city, building)
-      && waterCoveredTiles.has(getTileKey(building.x, building.y))
-      && building.hasFood !== true);
+    .filter((building) => {
+      const status = getHouseStatus(building.level, getHouseServices(city, building));
+      return status.missingForCurrentLevel === 'food' || status.missingForNextLevel === 'food';
+    });
 }
 
 function getInactiveWorkplaces(city: CityState): Building[] {

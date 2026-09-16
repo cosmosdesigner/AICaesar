@@ -1,28 +1,23 @@
 import { getBuildingAt, getTile, type Building, type CityState } from './CityState';
 import type { BuildingType } from './Tile';
+import {
+  HOUSE_DEGRADE_TICKS,
+  getHouseSpecification,
+  getHouseStatus,
+  normalizeHouseLevel,
+  type HouseLevel,
+  type HouseServices,
+} from './HouseSpecification';
+
+type WorkplaceType = 'farm' | 'granary' | 'market';
+type WorkplaceBuilding = Building & { readonly type: WorkplaceType };
 
 export const WATER_RADIUS = 3;
 export const MARKET_FOOD_RADIUS = 4;
 export const FARM_FOOD_PER_TICK = 2;
 export const GRANARY_CAPACITY = 100;
-export const HOUSE_LEVEL_2_TICKS = 3;
-export const HOUSE_LEVEL_3_TICKS = 5;
 export const HOUSE_FOOD_CONSUMPTION_INTERVAL = 2;
-
-type WorkplaceType = 'farm' | 'granary' | 'market';
-type WorkplaceBuilding = Building & { readonly type: WorkplaceType };
-
-export const HOUSE_POPULATION_BY_LEVEL: Readonly<Record<1 | 2 | 3, number>> = {
-  1: 4,
-  2: 8,
-  3: 14,
-};
 export const FINANCE_INTERVAL_TICKS = 10;
-export const HOUSE_TAX_BY_LEVEL: Readonly<Record<1 | 2 | 3, number>> = {
-  1: 2,
-  2: 4,
-  3: 7,
-};
 export const BUILDING_UPKEEP: Readonly<Partial<Record<BuildingType, number>>> = {
   well: 1,
   farm: 3,
@@ -49,6 +44,10 @@ export interface HousingStats {
   readonly levelTwoHouses: number;
   readonly levelThreeHouses: number;
   readonly waterCoveredTiles: number;
+  readonly blockedByRoad: number;
+  readonly blockedByWater: number;
+  readonly blockedByFood: number;
+  readonly degradingHouses: number;
 }
 
 export interface FoodStats {
@@ -107,7 +106,11 @@ export function simulateTick(city: CityState): void {
       building.hasFood = false;
     }
 
-    updateHouseLevel(building);
+    updateHouseLevel(building, {
+      road: building.hasRoadAccess,
+      water: building.hasWater,
+      food: building.hasFood,
+    });
   }
 
   if (shouldConsumeFood) city.resources.food = availableFood;
@@ -118,7 +121,7 @@ export function simulateTick(city: CityState): void {
 export function getHouseTax(city: CityState): number {
   return city.buildings.reduce((total, building) => {
     if (building.type !== 'house') return total;
-    return total + HOUSE_TAX_BY_LEVEL[getHouseLevel(building)];
+    return total + getHouseSpecification(building.level).taxPerPeriod;
   }, 0);
 }
 
@@ -161,6 +164,14 @@ export function hasWaterAccess(city: CityState, building: Building): boolean {
   return getWaterCoverage(city).has(getTileKey(building.x, building.y));
 }
 
+export function getHouseServices(city: CityState, building: Building): HouseServices {
+  return {
+    road: hasAdjacentRoad(city, building),
+    water: hasWaterAccess(city, building),
+    food: building.hasFood === true,
+  };
+}
+
 export function getWaterCoveredTiles(city: CityState): Set<string> {
   return getWaterCoverage(city);
 }
@@ -191,8 +202,7 @@ export function assignWorkers(city: CityState): void {
 export function getPopulation(city: CityState): number {
   return city.buildings.reduce((population, building) => {
     if (building.type !== 'house') return population;
-    const level = Math.min(Math.max(building.level ?? 1, 1), 3) as 1 | 2 | 3;
-    return population + HOUSE_POPULATION_BY_LEVEL[level];
+    return population + getHouseSpecification(building.level).populationCapacity;
   }, 0);
 }
 
@@ -245,16 +255,29 @@ export function getHousingStats(city: CityState): HousingStats {
   let housesWithFood = 0;
   let levelTwoHouses = 0;
   let levelThreeHouses = 0;
-
+  let blockedByRoad = 0;
+  let blockedByWater = 0;
+  let blockedByFood = 0;
+  let degradingHouses = 0;
   for (const building of city.buildings) {
     if (building.type !== 'house') continue;
 
     totalHouses += 1;
-    if (hasAdjacentRoad(city, building)) housesWithRoadAccess += 1;
-    if (waterCoverage.has(getTileKey(building.x, building.y))) housesWithWater += 1;
-    if (building.hasFood === true) housesWithFood += 1;
-    if ((building.level ?? 1) >= 2) levelTwoHouses += 1;
-    if ((building.level ?? 1) >= 3) levelThreeHouses += 1;
+    const services: HouseServices = {
+      road: hasAdjacentRoad(city, building),
+      water: waterCoverage.has(getTileKey(building.x, building.y)),
+      food: building.hasFood === true,
+    };
+    const status = getHouseStatus(building.level, services);
+    if (services.road) housesWithRoadAccess += 1;
+    if (services.water) housesWithWater += 1;
+    if (services.food) housesWithFood += 1;
+    if (status.currentLevel >= 2) levelTwoHouses += 1;
+    if (status.currentLevel >= 3) levelThreeHouses += 1;
+    if (status.missingForNextLevel === 'road') blockedByRoad += 1;
+    if (status.missingForNextLevel === 'water') blockedByWater += 1;
+    if (status.missingForNextLevel === 'food') blockedByFood += 1;
+    if (status.shouldDegrade) degradingHouses += 1;
   }
 
   return {
@@ -265,6 +288,10 @@ export function getHousingStats(city: CityState): HousingStats {
     levelTwoHouses,
     levelThreeHouses,
     waterCoveredTiles: waterCoverage.size,
+    blockedByRoad,
+    blockedByWater,
+    blockedByFood,
+    degradingHouses,
   };
 }
 
@@ -300,8 +327,8 @@ function produceFood(city: CityState): void {
   );
 }
 
-function getHouseLevel(building: Building): 1 | 2 | 3 {
-  return Math.min(Math.max(building.level ?? 1, 1), 3) as 1 | 2 | 3;
+function getHouseLevel(building: Building): HouseLevel {
+  return normalizeHouseLevel(building.level);
 }
 
 function getTicksUntilNextFinancePeriod(tick: number): number {
@@ -309,32 +336,33 @@ function getTicksUntilNextFinancePeriod(tick: number): number {
   return elapsedInPeriod === 0 ? FINANCE_INTERVAL_TICKS : FINANCE_INTERVAL_TICKS - elapsedInPeriod;
 }
 
-function updateHouseLevel(building: Building): void {
-  const level = building.level ?? 1;
+function updateHouseLevel(building: Building, services: HouseServices): void {
+  const currentLevel = getHouseLevel(building);
+  const status = getHouseStatus(currentLevel, services);
 
-  if (level < 2) {
-    if (building.hasRoadAccess === true && building.hasWater === true) {
-      building.upgradeProgress = (building.upgradeProgress ?? 0) + 1;
-      if (building.upgradeProgress >= HOUSE_LEVEL_2_TICKS) {
-        building.level = 2;
-        building.upgradeProgress = 0;
-      }
-    } else {
+  if (status.shouldDegrade) {
+    building.upgradeProgress = 0;
+    building.degradeProgress = (building.degradeProgress ?? 0) + 1;
+    if (building.degradeProgress >= HOUSE_DEGRADE_TICKS) {
+      building.level = Math.max(1, currentLevel - 1) as HouseLevel;
       building.upgradeProgress = 0;
+      building.degradeProgress = 0;
     }
     return;
   }
 
-  if (level < 3) {
-    if (building.hasRoadAccess === true && building.hasWater === true && building.hasFood === true) {
-      building.upgradeProgress = (building.upgradeProgress ?? 0) + 1;
-      if (building.upgradeProgress >= HOUSE_LEVEL_3_TICKS) {
-        building.level = 3;
-        building.upgradeProgress = 0;
-      }
-    } else {
-      building.upgradeProgress = 0;
-    }
+  building.degradeProgress = 0;
+  if (!status.canUpgrade) {
+    building.upgradeProgress = 0;
+    return;
+  }
+
+  const nextLevel = (currentLevel + 1) as HouseLevel;
+  building.upgradeProgress = (building.upgradeProgress ?? 0) + 1;
+  if (building.upgradeProgress >= getHouseSpecification(nextLevel).upgradeTicks) {
+    building.level = nextLevel;
+    building.upgradeProgress = 0;
+    building.degradeProgress = 0;
   }
 }
 

@@ -60,8 +60,9 @@ npm run preview
 - Dinheiro inicial: **500** em `resources.money`, comida inicial **0** em `resources.food`, além da cidade seedada (os edifícios iniciais não são cobrados).
 - Selecionar **Road (4)**, **House (20)**, **Well (35)**, **Farm (45)**, **Granary (60)** ou **Market (50)** no painel; Road começa selecionada.
 - Clicar com o botão principal num tile vazio para construir. O dinheiro diminui pelo custo indicado.
-- Cada construção cria um `Building { id, type, x, y }`; casas também guardam `level`, `hasRoadAccess`, `hasWater`, `hasFood` e `upgradeProgress`; workplaces (`farm`, `granary`, `market`) guardam `active` para feedback visual simples; granaries recebem `storedFood` temporário, com o stock efetivo centralizado em `resources.food`.
-- O painel mostra dinheiro, ferramenta selecionada, tick, estatísticas de casas/água/comida, estatísticas de emprego, painel financeiro, toggles de overlay com labels claros, feedback da última ação e estado do cenário.
+- Cada construção cria um `Building { id, type, x, y }`; casas também guardam `level`, `hasRoadAccess`, `hasWater`, `hasFood`, `upgradeProgress` e `degradeProgress`; workplaces (`farm`, `granary`, `market`) guardam `active` para feedback visual simples; granaries recebem `storedFood` temporário, com o stock efetivo centralizado em `resources.food`.
+- Casas usam `src/simulation/HouseSpecification.ts` como fonte declarativa de capacidade, imposto, requisitos e ticks de evolução dos níveis 1–3: nível 1 tem capacidade 4/imposto 2 sem requisitos, nível 2 capacidade 8/imposto 4 com estrada+água e 3 ticks, nível 3 capacidade 14/imposto 7 com estrada+água+comida e 5 ticks. Perder requisitos durante 4 ticks degrada uma casa um nível por vez; recuperar serviços cancela a degradação pendente.
+- O painel mostra dinheiro, ferramenta selecionada, tick, estatísticas de casas/água/comida, resumo de requisitos de casas bloqueadas por estrada/água/comida, casas em degradação, estatísticas de emprego, painel financeiro, toggles de overlay com labels claros, feedback da última ação e estado do cenário.
 - Tiles ocupados, coordenadas fora do mapa, dinheiro insuficiente e cenário terminado são rejeitados sem alterar cidade, saldo ou comida. O balanço financeiro pode tornar o saldo negativo; `placeBuilding` continua a validar o saldo disponível antes de construir.
 - **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `resources.food`, `simulation.tick`, `simulation.finance`, edifícios iniciais, estado ativo/inativo recalculado e cenário **Active**; mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
 
@@ -137,5 +138,6 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 - [MVP](documentation/mvp.md)
 - [Plano da Fase 14](documentation/phase-14-development-plan.md)
 - [Plano da Fase 15](documentation/phase-15-development-plan.md)
+- [Plano da Fase 16](documentation/phase-16-development-plan.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)

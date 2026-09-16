@@ -22,6 +22,7 @@ export interface Building {
   hasWater?: boolean;
   hasFood?: boolean;
   upgradeProgress?: number;
+  degradeProgress?: number;
   storedFood?: number;
   active?: boolean;
 }
@@ -135,6 +136,7 @@ function addBuilding(city: CityState, x: number, y: number, type: BuildingType):
         hasWater: false,
         hasFood: false,
         upgradeProgress: 0,
+        degradeProgress: 0,
       }
     : {
         id: `${type}-${x}-${y}`,

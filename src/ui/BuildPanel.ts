@@ -48,6 +48,10 @@ export class BuildPanel {
   private readonly housesLevelTwo = document.createElement('strong');
   private readonly housesLevelThree = document.createElement('strong');
   private readonly waterTiles = document.createElement('strong');
+  private readonly blockedByRoad = document.createElement('strong');
+  private readonly blockedByWater = document.createElement('strong');
+  private readonly blockedByFood = document.createElement('strong');
+  private readonly degradingHouses = document.createElement('strong');
   private readonly foodStored = document.createElement('strong');
   private readonly farms = document.createElement('strong');
   private readonly granaries = document.createElement('strong');
@@ -130,6 +134,18 @@ export class BuildPanel {
       this.createStat('Workplaces inativos', this.inactiveWorkplaces),
     );
 
+    const housingRequirements = document.createElement('div');
+    housingRequirements.className = 'housing-requirements';
+    const housingRequirementsTitle = document.createElement('h2');
+    housingRequirementsTitle.textContent = 'Housing requirements';
+    housingRequirements.append(
+      housingRequirementsTitle,
+      this.createStat('Blocked by road', this.blockedByRoad),
+      this.createStat('Blocked by water', this.blockedByWater),
+      this.createStat('Blocked by food', this.blockedByFood),
+      this.createStat('Degrading', this.degradingHouses),
+    );
+
     const finance = document.createElement('div');
     finance.className = 'finance-stats';
     finance.title = 'Taxes from houses minus upkeep for wells, farms, granaries and markets every 10 ticks.';
@@ -186,6 +202,7 @@ export class BuildPanel {
       tick,
       tools,
       stats,
+      housingRequirements,
       finance,
       this.waterOverlay,
       this.foodOverlay,
@@ -210,6 +227,10 @@ export class BuildPanel {
     this.housesLevelTwo.textContent = String(housingStats.levelTwoHouses);
     this.housesLevelThree.textContent = String(housingStats.levelThreeHouses);
     this.waterTiles.textContent = String(housingStats.waterCoveredTiles);
+    this.blockedByRoad.textContent = String(housingStats.blockedByRoad);
+    this.blockedByWater.textContent = String(housingStats.blockedByWater);
+    this.blockedByFood.textContent = String(housingStats.blockedByFood);
+    this.degradingHouses.textContent = String(housingStats.degradingHouses);
     this.foodStored.textContent = `${foodStats.foodStored}/${foodStats.foodCapacity}`;
     this.farms.textContent = String(foodStats.farms);
     this.granaries.textContent = String(foodStats.granaries);
