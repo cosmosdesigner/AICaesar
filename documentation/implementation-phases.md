@@ -517,3 +517,308 @@ Não cortar:
 - action validator.
 
 Esses quatro elementos são o núcleo diferencial do AICaesar.
+
+## 19. Roadmap pós-MVP — transformar demo em jogo jogável
+
+As fases 0–12 criam uma demo técnica: construção, simulação básica, analyzer, advisor, execução segura e after-action report.
+
+Para ser um jogo que dá vontade de jogar "a sério", o próximo objetivo deixa de ser provar tecnologia e passa a ser criar um loop de jogo com decisões, pressão, progressão e objetivos claros.
+
+Princípio para o pós-MVP:
+
+> Tornar cada decisão do jogador relevante antes de adicionar mais sistemas.
+
+## 20. Fase 13 — Loop de jogo e objetivos de cenário
+
+### Objetivo
+
+Criar uma experiência com começo, objetivo e condição de sucesso/falha.
+
+### Entregáveis
+
+- sistema de cenário;
+- objetivos visíveis;
+- condição de vitória;
+- condição de derrota simples;
+- painel de progresso;
+- primeiro cenário jogável de 10–15 minutos.
+
+### Exemplo de cenário inicial
+
+"Fundar uma pequena cidade funcional."
+
+Objetivos:
+
+- alcançar 80 habitantes;
+- ter 70% das casas com água;
+- ter 50% das casas com comida;
+- manter worker shortage abaixo de 20%;
+- terminar com dinheiro acima de 100.
+
+### Critérios de aceitação
+
+- jogador entende o objetivo sem ler documentação;
+- jogo mostra progresso;
+- vitória é detetada automaticamente;
+- derrota por falência/colapso é detetada automaticamente;
+- advisor consegue comentar o objetivo principal.
+
+## 21. Fase 14 — Economia mínima e rendimento
+
+### Objetivo
+
+Fazer dinheiro importar para além de ser apenas um contador que desce.
+
+### Entregáveis
+
+- impostos simples baseados em população/casas evoluídas;
+- upkeep por edifício económico;
+- saldo líquido por tick ou por mês;
+- painel financeiro;
+- falência como condição de derrota.
+
+### Regras simples
+
+- casas geram impostos por nível;
+- farms/granaries/markets/wells têm upkeep;
+- roads podem ter upkeep muito baixo ou zero;
+- se dinheiro ficar abaixo de 0 durante N ticks, derrota.
+
+### Critérios de aceitação
+
+- cidade sustentável ganha dinheiro;
+- cidade mal planeada perde dinheiro;
+- jogador precisa equilibrar expansão e manutenção.
+
+## 22. Fase 15 — Crescimento populacional e migração
+
+### Objetivo
+
+Substituir população estática por crescimento condicionado pelos serviços.
+
+### Entregáveis
+
+- casas têm população atual/capacidade;
+- população cresce quando há serviços básicos;
+- população estagna ou diminui sem serviços;
+- desemprego/worker shortage passam a emergir da população;
+- UI mostra crescimento líquido.
+
+### Regras simples
+
+- house level define capacidade;
+- água/comida aumentam ocupação;
+- falta de comida reduz ocupação lentamente;
+- população influencia impostos e trabalhadores.
+
+### Critérios de aceitação
+
+- construir casas vazias não resolve imediatamente falta de workers;
+- serviços atraem habitantes;
+- colapso de comida afeta população, impostos e trabalhadores.
+
+## 23. Fase 16 — Road network e walkers simplificados
+
+### Objetivo
+
+Dar mais peso ao layout da cidade.
+
+### Entregáveis
+
+- cálculo de conectividade por estrada;
+- edifícios precisam estar ligados à rede principal;
+- markets/wells/farms distribuem por distância na estrada em vez de raio direto;
+- walkers visuais simples opcionais.
+
+### Simplificação
+
+Não implementar simulação completa de walkers estilo Caesar III ainda.
+
+Primeiro passo:
+
+- usar BFS/graph distance nas estradas;
+- mostrar cobertura baseada na rede;
+- depois adicionar walkers visuais como feedback, não como fonte de verdade.
+
+### Critérios de aceitação
+
+- layout de estradas muda cobertura real;
+- edifícios isolados deixam de funcionar;
+- jogador precisa desenhar bairros coerentes.
+
+## 24. Fase 17 — Desirability e evolução habitacional
+
+### Objetivo
+
+Adicionar qualidade urbana como decisão de layout.
+
+### Entregáveis
+
+- desirability por tile;
+- efeitos positivos: gardens, fountain/plaza, services;
+- efeitos negativos: farms/industry/warehouse próximos;
+- casas evoluem/degradam com desirability + serviços;
+- overlay de desirability.
+
+### Novos edifícios sugeridos
+
+- garden;
+- plaza;
+- fountain;
+- prefecture ou basic safety building mais tarde.
+
+### Critérios de aceitação
+
+- jogador separa indústria/comida de habitação;
+- bairros bem planeados evoluem melhor;
+- analyzer deteta baixa desirability.
+
+## 25. Fase 18 — Cadeias económicas reais
+
+### Objetivo
+
+Transformar comida e produção num sistema mais interessante.
+
+### Entregáveis
+
+- múltiplos alimentos ou bens simples;
+- farms com output diferente;
+- warehouses/granaries com stock por tipo;
+- markets precisam abastecer-se;
+- consumo por população;
+- bottlenecks visíveis.
+
+### Ordem recomendada
+
+1. food types simples: vegetables/meat/fruit;
+2. storage por tipo;
+3. market supply;
+4. consumo por casas;
+5. advisor identifica bottlenecks.
+
+### Critérios de aceitação
+
+- cadeia produtiva pode falhar em produção, armazenamento ou distribuição;
+- advisor consegue distinguir a causa;
+- jogador tem escolhas reais de infraestrutura.
+
+## 26. Fase 19 — Eventos e pressão de jogo
+
+### Objetivo
+
+Criar tensão e variação entre sessões.
+
+### Entregáveis
+
+- eventos determinísticos/aleatórios controlados;
+- seca reduz produção de farms;
+- epidemia reduz população temporariamente;
+- incêndio/risco urbano simples;
+- mensagens de evento;
+- advisor reage a eventos.
+
+### Critérios de aceitação
+
+- jogador precisa adaptar planos;
+- eventos são compreensíveis e não parecem injustos;
+- há warning antes de eventos severos quando possível.
+
+## 27. Fase 20 — Save/load local
+
+### Objetivo
+
+Permitir continuidade de jogo.
+
+### Entregáveis
+
+- serialização de `CityState`;
+- save/load em `localStorage` ou ficheiro local no futuro;
+- botão Save;
+- botão Load;
+- versão do schema;
+- reset continua disponível.
+
+### Critérios de aceitação
+
+- jogador consegue voltar à cidade;
+- saves antigos falham de forma segura se schema mudar;
+- não há backend.
+
+## 28. Fase 21 — UX de jogo sério
+
+### Objetivo
+
+Reduzir fricção e tornar decisões legíveis.
+
+### Entregáveis
+
+- tooltips ricos por edifício;
+- seleção de tile mostra detalhes;
+- preview antes de construir;
+- erro visual no tile inválido;
+- painel de logs/eventos;
+- objetivos sempre visíveis;
+- atalhos de teclado básicos.
+
+### Critérios de aceitação
+
+- jogador entende por que algo funciona ou falha;
+- é possível jogar sem abrir o README;
+- ações comuns são rápidas.
+
+## 29. Fase 22 — Advisor estratégico
+
+### Objetivo
+
+Fazer o advisor ser útil como parceiro de jogo, não só corretor de problemas.
+
+### Entregáveis
+
+- advisor considera objetivo do cenário;
+- planos com múltiplas ações;
+- comparação de alternativas;
+- trade-offs explícitos;
+- orçamento aprovado pelo jogador;
+- after-action report compara promessa vs resultado.
+
+### Critérios de aceitação
+
+- advisor propõe planos úteis para vencer cenário;
+- jogador pode aceitar/rejeitar com confiança;
+- executor continua a validar tudo.
+
+## 30. Fase 23 — Conteúdo e balanceamento
+
+### Objetivo
+
+Transformar sistemas em jogo equilibrado.
+
+### Entregáveis
+
+- 3 cenários jogáveis;
+- custos ajustados;
+- curvas de crescimento;
+- objetivos graduais;
+- dificuldade fácil/normal;
+- playtest checklist;
+- métricas de sessão.
+
+### Critérios de aceitação
+
+- cenário 1 ensina;
+- cenário 2 exige planeamento;
+- cenário 3 testa resiliência;
+- uma sessão de 30 minutos tem progressão clara.
+
+## 31. Próximo passo recomendado
+
+A próxima fase a implementar deve ser a Fase 13: loop de jogo e objetivos de cenário.
+
+Motivo:
+
+- sem objetivo, o protótipo continua sandbox;
+- com objetivo, todas as mecânicas existentes passam a ter propósito;
+- dá uma base clara para balanceamento, economia, advisor e eventos;
+- é o menor passo que transforma a demo num jogo.
+
+Não recomendo começar já por LLM real, walkers complexos ou mais edifícios. Isso aumentaria complexidade antes de existir um loop jogável validado.
