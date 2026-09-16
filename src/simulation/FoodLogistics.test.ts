@@ -27,7 +27,7 @@ function createEmptyCity(width = 20, height = 20): CityState {
     tiles,
     buildings: [],
     resources: { money: 500 },
-    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
+    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 }, population: { lastChange: 0 } },
   };
 }
 
@@ -50,7 +50,7 @@ function addBuilding(city: CityState, type: BuildingType, x: number, y: number, 
 }
 
 function addWorkerHouse(city: CityState, x: number, y: number): Building {
-  return addBuilding(city, 'house', x, y, { level: 3, hasFood: true, hasWater: true, hasRoadAccess: true });
+  return addBuilding(city, 'house', x, y, { level: 3, population: 14, hasFood: true, hasWater: true, hasRoadAccess: true });
 }
 
 describe('Phase 17 food logistics', () => {

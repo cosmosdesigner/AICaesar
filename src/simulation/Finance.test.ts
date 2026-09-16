@@ -26,6 +26,7 @@ function createEmptyCity(width = 8, height = 8, money = 500): CityState {
     simulation: {
       tick: 0,
       finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 },
+      population: { lastChange: 0 },
     },
   };
 }
@@ -48,9 +49,9 @@ function addBuilding(city: CityState, type: BuildingType, x: number, y: number, 
 describe('minimal finance economy', () => {
   it('calculates house taxes by level', () => {
     const city = createEmptyCity();
-    addBuilding(city, 'house', 1, 1, { level: 1 });
-    addBuilding(city, 'house', 2, 1, { level: 2 });
-    addBuilding(city, 'house', 3, 1, { level: 3 });
+    addBuilding(city, 'house', 1, 1, { level: 1, population: 4 });
+    addBuilding(city, 'house', 2, 1, { level: 2, population: 8 });
+    addBuilding(city, 'house', 3, 1, { level: 3, population: 14 });
 
     expect(getHouseTax(city)).toBe(13);
   });
@@ -69,7 +70,7 @@ describe('minimal finance economy', () => {
 
   it('applies one finance period to money and last-period state', () => {
     const city = createEmptyCity(8, 8, 100);
-    addBuilding(city, 'house', 1, 1, { level: 3 });
+    addBuilding(city, 'house', 1, 1, { level: 3, population: 14 });
     addBuilding(city, 'well', 2, 1);
 
     expect(applyFinancePeriod(city)).toEqual({
@@ -90,7 +91,7 @@ describe('minimal finance economy', () => {
 
   it('applies finance only on the configured simulation tick interval', () => {
     const city = createEmptyCity(8, 8, 100);
-    addBuilding(city, 'house', 1, 1, { level: 1 });
+    addBuilding(city, 'house', 1, 1, { level: 1, population: 4 });
     addBuilding(city, 'well', 2, 1);
 
     for (let i = 0; i < FINANCE_INTERVAL_TICKS - 1; i++) simulateTick(city);
@@ -106,10 +107,10 @@ describe('minimal finance economy', () => {
     simulateTick(city);
     expect(getFinanceStats(city)).toEqual({
       period: 1,
-      revenue: 2,
+      revenue: 1,
       upkeep: 1,
-      net: 1,
-      money: 101,
+      net: 0,
+      money: 100,
       ticksUntilNextPeriod: FINANCE_INTERVAL_TICKS,
     });
   });

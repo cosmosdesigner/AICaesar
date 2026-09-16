@@ -1,6 +1,6 @@
 import { analyzeCity } from '../analysis/CityAnalyzer';
 import { BUILD_COSTS, type CityState } from '../simulation/CityState';
-import { getFinanceStats, getFoodStats, getHousingStats, getWorkforceStats } from '../simulation/Simulation';
+import { getFinanceStats, getFoodStats, getHousingStats, getPopulationStats, getWorkforceStats } from '../simulation/Simulation';
 import type { BuildingType } from '../simulation/Tile';
 
 export const BUILD_LABELS: Readonly<Record<BuildingType, string>> = {
@@ -14,7 +14,7 @@ export const BUILD_LABELS: Readonly<Record<BuildingType, string>> = {
 
 const BUILD_TITLES: Readonly<Record<BuildingType, string>> = {
   road: 'Roads connect services and buildings.',
-  house: 'Houses increase population and available workers.',
+  house: 'Houses begin empty and attract residents when they have road, water and food.',
   well: 'Wells provide water coverage to nearby houses.',
   farm: 'Farms produce food when enough workers are available.',
   granary: 'Granaries add food storage capacity when active.',
@@ -62,6 +62,8 @@ export class BuildPanel {
   private readonly markets = document.createElement('strong');
   private readonly foodTiles = document.createElement('strong');
   private readonly population = document.createElement('strong');
+  private readonly availableHousing = document.createElement('strong');
+  private readonly populationLastChange = document.createElement('strong');
   private readonly workersAvailable = document.createElement('strong');
   private readonly workersRequired = document.createElement('strong');
   private readonly workersAssigned = document.createElement('strong');
@@ -133,6 +135,8 @@ export class BuildPanel {
       this.createStat('Markets', this.markets),
       this.createStat('Tiles com comida', this.foodTiles),
       this.createStat('População', this.population),
+      this.createStat('Available housing', this.availableHousing),
+      this.createStat('Growth last tick', this.populationLastChange),
       this.createStat('Trabalhadores disponíveis', this.workersAvailable),
       this.createStat('Trabalhadores necessários', this.workersRequired),
       this.createStat('Trabalhadores atribuídos', this.workersAssigned),
@@ -225,6 +229,7 @@ export class BuildPanel {
     const housingStats = getHousingStats(city);
     const foodStats = getFoodStats(city);
     const workforceStats = getWorkforceStats(city);
+    const populationStats = getPopulationStats(city);
     const financeStats = getFinanceStats(city);
     this.money.textContent = String(city.resources.money);
     this.tick.textContent = String(city.simulation.tick);
@@ -248,7 +253,9 @@ export class BuildPanel {
     this.granaries.textContent = String(foodStats.granaries);
     this.markets.textContent = String(foodStats.markets);
     this.foodTiles.textContent = String(foodStats.foodCoveredTiles);
-    this.population.textContent = String(workforceStats.population);
+    this.population.textContent = `${populationStats.population}/${populationStats.capacity}`;
+    this.availableHousing.textContent = String(populationStats.availableHousing);
+    this.populationLastChange.textContent = formatSignedFinanceValue(populationStats.lastChange);
     this.workersAvailable.textContent = String(workforceStats.workersAvailable);
     this.workersRequired.textContent = String(workforceStats.workersRequired);
     this.workersAssigned.textContent = String(workforceStats.workersAssigned);

@@ -25,7 +25,7 @@ function createEmptyCity(width = 8, height = 8): CityState {
     tiles,
     buildings: [],
     resources: { money: 500 },
-    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
+    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 }, population: { lastChange: 0 } },
   };
 }
 
@@ -82,29 +82,21 @@ describe('HouseSpecification', () => {
     });
   });
 
-  it('derives population and taxes from the specification', () => {
+  it('derives population and proportional taxes from current occupancy', () => {
     const city = createEmptyCity();
-    addBuilding(city, 'house', 1, 1, { level: 1 });
-    addBuilding(city, 'house', 2, 1, { level: 2 });
-    addBuilding(city, 'house', 3, 1, { level: 3 });
+    addBuilding(city, 'house', 1, 1, { level: 1, population: 4 });
+    addBuilding(city, 'house', 2, 1, { level: 2, population: 4 });
+    addBuilding(city, 'house', 3, 1, { level: 3, population: 7 });
 
-    expect(getPopulation(city)).toBe(
-      HOUSE_SPECIFICATIONS[1].populationCapacity
-      + HOUSE_SPECIFICATIONS[2].populationCapacity
-      + HOUSE_SPECIFICATIONS[3].populationCapacity,
-    );
-    expect(getHouseTax(city)).toBe(
-      HOUSE_SPECIFICATIONS[1].taxPerPeriod
-      + HOUSE_SPECIFICATIONS[2].taxPerPeriod
-      + HOUSE_SPECIFICATIONS[3].taxPerPeriod,
-    );
+    expect(getPopulation(city)).toBe(15);
+    expect(getHouseTax(city)).toBe(8);
   });
 });
 
 describe('house evolution and degradation', () => {
   it('evolves a road and water served house from level 1 to level 2 after 3 ticks', () => {
     const city = createEmptyCity();
-    const house = addBuilding(city, 'house', 2, 2, { level: 1, upgradeProgress: 0, degradeProgress: 0 });
+    const house = addBuilding(city, 'house', 2, 2, { level: 1, population: 4, upgradeProgress: 0, degradeProgress: 0 });
     addBuilding(city, 'road', 1, 2);
     addBuilding(city, 'well', 2, 4);
 
@@ -120,9 +112,9 @@ describe('house evolution and degradation', () => {
 
   it('evolves a road, water and food served house from level 2 to level 3 after 5 ticks', () => {
     const city = createEmptyCity();
-    const house = addBuilding(city, 'house', 2, 2, { level: 2, upgradeProgress: 0, degradeProgress: 0 });
-    addBuilding(city, 'house', 6, 4, { level: 3 });
-    addBuilding(city, 'house', 6, 5, { level: 3 });
+    const house = addBuilding(city, 'house', 2, 2, { level: 2, population: 8, upgradeProgress: 0, degradeProgress: 0 });
+    addBuilding(city, 'house', 6, 4, { level: 3, population: 14 });
+    addBuilding(city, 'house', 6, 5, { level: 3, population: 14 });
     addBuilding(city, 'road', 1, 2);
     addBuilding(city, 'well', 2, 4);
     addBuilding(city, 'granary', 6, 6, { active: false });
@@ -140,7 +132,7 @@ describe('house evolution and degradation', () => {
 
   it('degrades a level 3 house without food to level 2 after 4 ticks', () => {
     const city = createEmptyCity();
-    const house = addBuilding(city, 'house', 2, 2, { level: 3, upgradeProgress: 0, degradeProgress: 0 });
+    const house = addBuilding(city, 'house', 2, 2, { level: 3, population: 14, upgradeProgress: 0, degradeProgress: 0 });
     addBuilding(city, 'road', 1, 2);
     addBuilding(city, 'well', 2, 4);
 
@@ -156,7 +148,7 @@ describe('house evolution and degradation', () => {
 
   it('degrades a level 2 house without water to level 1 after 4 ticks', () => {
     const city = createEmptyCity();
-    const house = addBuilding(city, 'house', 2, 2, { level: 2, upgradeProgress: 0, degradeProgress: 0 });
+    const house = addBuilding(city, 'house', 2, 2, { level: 2, population: 8, upgradeProgress: 0, degradeProgress: 0 });
     addBuilding(city, 'road', 1, 2);
 
     tick(city, HOUSE_DEGRADE_TICKS);
@@ -168,11 +160,11 @@ describe('house evolution and degradation', () => {
 
   it('cancels pending degradation when services recover before the limit', () => {
     const city = createEmptyCity();
-    const house = addBuilding(city, 'house', 2, 2, { level: 3, upgradeProgress: 0, degradeProgress: 0 });
+    const house = addBuilding(city, 'house', 2, 2, { level: 3, population: 14, upgradeProgress: 0, degradeProgress: 0 });
     addBuilding(city, 'road', 1, 2);
     addBuilding(city, 'well', 2, 4);
-    addBuilding(city, 'house', 6, 4, { level: 3 });
-    addBuilding(city, 'house', 6, 5, { level: 3 });
+    addBuilding(city, 'house', 6, 4, { level: 3, population: 14 });
+    addBuilding(city, 'house', 6, 5, { level: 3, population: 14 });
 
     tick(city, HOUSE_DEGRADE_TICKS - 1);
     expect(house.degradeProgress).toBe(3);
@@ -192,5 +184,6 @@ describe('house evolution and degradation', () => {
     expect(houses.length).toBeGreaterThan(0);
     expect(houses.every((house) => house.upgradeProgress === 0)).toBe(true);
     expect(houses.every((house) => house.degradeProgress === 0)).toBe(true);
+    expect(houses.every((house) => house.population === HOUSE_SPECIFICATIONS[1].populationCapacity)).toBe(true);
   });
 });

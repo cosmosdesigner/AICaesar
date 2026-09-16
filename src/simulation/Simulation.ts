@@ -20,6 +20,8 @@ export const GRANARY_FOOD_CAPACITY = 100;
 export const MARKET_FOOD_CAPACITY = 40;
 export const MARKET_RESTOCK_PER_TICK = 4;
 export const HOUSE_FOOD_CONSUMPTION_INTERVAL = 2;
+export const POPULATION_GROWTH_INTERVAL_TICKS = 3;
+export const POPULATION_DECLINE_INTERVAL_TICKS = 5;
 export const FINANCE_INTERVAL_TICKS = 10;
 export const BUILDING_UPKEEP: Readonly<Partial<Record<BuildingType, number>>> = {
   well: 1,
@@ -79,6 +81,13 @@ export interface WorkforceStats {
   readonly activeWorkplaces: number;
   readonly inactiveWorkplaces: number;
 }
+
+export interface PopulationStats {
+  readonly population: number;
+  readonly capacity: number;
+  readonly availableHousing: number;
+  readonly lastChange: number;
+}
 export interface FinanceStats {
   readonly period: number;
   readonly revenue: number;
@@ -102,6 +111,7 @@ export function simulateTick(city: CityState): void {
     .filter((building) => building.type === 'house')
     .sort(compareBuildingsByPosition);
 
+  let populationLastChange = 0;
   for (const building of houses) {
     building.hasRoadAccess = hasAdjacentRoad(city, building);
     building.hasWater = waterCoverage.has(getTileKey(building.x, building.y));
@@ -114,12 +124,18 @@ export function simulateTick(city: CityState): void {
       building.hasFood = false;
     }
 
-    updateHouseLevel(building, {
+    const previousPopulation = getHousePopulation(building);
+    const services: HouseServices = {
       road: building.hasRoadAccess,
       water: building.hasWater,
       food: building.hasFood,
-    });
+    };
+    updateHouseLevel(building, services);
+    clampHousePopulation(building);
+    updateHousePopulation(city, building, services);
+    populationLastChange += getHousePopulation(building) - previousPopulation;
   }
+  city.simulation.population.lastChange = populationLastChange;
 
   assignWorkers(city);
   if (city.simulation.tick % FINANCE_INTERVAL_TICKS === 0) applyFinancePeriod(city);
@@ -128,7 +144,10 @@ export function simulateTick(city: CityState): void {
 export function getHouseTax(city: CityState): number {
   return city.buildings.reduce((total, building) => {
     if (building.type !== 'house') return total;
-    return total + getHouseSpecification(building.level).taxPerPeriod;
+    const specification = getHouseSpecification(building.level);
+    const population = getHousePopulation(building);
+    if (population === 0) return total;
+    return total + Math.ceil((specification.taxPerPeriod * population) / specification.populationCapacity);
   }, 0);
 }
 
@@ -224,8 +243,25 @@ export function assignWorkers(city: CityState): void {
 export function getPopulation(city: CityState): number {
   return city.buildings.reduce((population, building) => {
     if (building.type !== 'house') return population;
-    return population + getHouseSpecification(building.level).populationCapacity;
+    return population + getHousePopulation(building);
   }, 0);
+}
+
+export function getPopulationStats(city: CityState): PopulationStats {
+  let population = 0;
+  let capacity = 0;
+  for (const building of city.buildings) {
+    if (building.type !== 'house') continue;
+    population += getHousePopulation(building);
+    capacity += getHouseCapacity(building);
+  }
+
+  return {
+    population,
+    capacity,
+    availableHousing: Math.max(0, capacity - population),
+    lastChange: city.simulation.population.lastChange,
+  };
 }
 
 export function getWorkforceStats(city: CityState): WorkforceStats {
@@ -435,9 +471,34 @@ function getHouseLevel(building: Building): HouseLevel {
   return normalizeHouseLevel(building.level);
 }
 
+function getHouseCapacity(building: Building): number {
+  return getHouseSpecification(building.level).populationCapacity;
+}
+
+function getHousePopulation(building: Building): number {
+  return building.population ?? 0;
+}
+
 function getTicksUntilNextFinancePeriod(tick: number): number {
   const elapsedInPeriod = tick % FINANCE_INTERVAL_TICKS;
   return elapsedInPeriod === 0 ? FINANCE_INTERVAL_TICKS : FINANCE_INTERVAL_TICKS - elapsedInPeriod;
+}
+
+function clampHousePopulation(building: Building): void {
+  building.population = Math.min(getHouseCapacity(building), getHousePopulation(building));
+}
+
+function updateHousePopulation(city: CityState, building: Building, services: HouseServices): void {
+  const population = getHousePopulation(building);
+  const capacity = getHouseCapacity(building);
+  if (services.road && services.water && services.food) {
+    if (city.simulation.tick % POPULATION_GROWTH_INTERVAL_TICKS !== 0 || population >= capacity) return;
+    building.population = population + 1;
+    return;
+  }
+
+  if (city.simulation.tick % POPULATION_DECLINE_INTERVAL_TICKS !== 0 || population === 0) return;
+  building.population = population - 1;
 }
 
 function updateHouseLevel(building: Building, services: HouseServices): void {

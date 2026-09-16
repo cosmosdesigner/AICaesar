@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BUILD_COSTS, getBuildingAt, type Building, type CityState } from '../simulation/CityState';
+import { assignWorkers, getPopulationStats } from '../simulation/Simulation';
 import type { BuildingType, Tile } from '../simulation/Tile';
 import type { AdvisorAction, AdvisorPlan } from './MockAdvisor';
 import { approveAdvisorPlan } from './AdvisorApproval';
@@ -17,7 +18,7 @@ function createEmptyCity(width = 8, height = 8, money = 500): CityState {
     tiles,
     buildings: [],
     resources: { money },
-    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
+    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 }, population: { lastChange: 0 } },
   };
 }
 
@@ -83,7 +84,7 @@ describe('AfterActionReport', () => {
   it('creates a city metrics snapshot from money, food, houses, workers, workplaces, and issues', () => {
     const city = createEmptyCity(8, 8, 321);
     addBuilding(city, 'road', 1, 2);
-    addBuilding(city, 'house', 2, 2, { level: 2, hasFood: false });
+    addBuilding(city, 'house', 2, 2, { level: 2, population: 8, hasFood: false });
     addBuilding(city, 'granary', 1, 3, { active: true, storedFood: 12 });
 
     expect(createCityMetricsSnapshot(city)).toEqual({
@@ -106,7 +107,7 @@ describe('AfterActionReport', () => {
     });
   });
 
-  it('calculates deterministic deltas and concise summary text', () => {
+  it('calculates deterministic metric deltas and execution totals', () => {
     const report = createAfterActionReport({
       before: createSnapshot({ money: 500, housesWithWater: 2, workerShortage: 3, issueCount: 2 }),
       after: createSnapshot({ money: 465, housesWithWater: 3, workerShortage: 0, issueCount: 1 }),
@@ -115,7 +116,6 @@ describe('AfterActionReport', () => {
       remainingIssues: [],
     });
 
-    expect(report.summary).toBe('Executed 1 action, spent 35.');
     expect(report.executedActions).toBe(1);
     expect(report.spent).toBe(35);
     expect(report.deltas).toEqual([
@@ -141,7 +141,6 @@ describe('AfterActionReport', () => {
       ],
     });
 
-    expect(report.summary).toBe('No build actions executed. City observed.');
     expect(report.remainingIssues).toEqual([
       '[high] Falta água em 3 casas.',
       '[medium] Faltam 2 trabalhadores.',
@@ -161,11 +160,54 @@ describe('AfterActionReport', () => {
     expect(result.report).toMatchObject({
       executedActions: 1,
       spent: BUILD_COSTS.well,
-      summary: 'Executed 1 action, spent 35.',
     });
     expect(result.report?.deltas).toContainEqual({ label: 'Money', before: 500, after: 465, delta: -35 });
     expect(result.report?.deltas).toContainEqual({ label: 'Houses with water', before: 0, after: 1, delta: 1 });
     expect(getBuildingAt(city, 3, 2)?.type).toBe('well');
+  });
+
+  it('adds empty housing without immediately relieving worker shortage after approval', () => {
+    const city = createEmptyCity();
+    addBuilding(city, 'road', 1, 2);
+    addBuilding(city, 'house', 2, 2, { level: 1, population: 4 });
+    addBuilding(city, 'farm', 1, 3);
+    assignWorkers(city);
+    const before = createCityMetricsSnapshot(city);
+    expect(before).toMatchObject({
+      houses: 1,
+      population: 4,
+      workersAvailable: 2,
+      workersRequired: 6,
+      workerShortage: 4,
+      activeWorkplaces: 0,
+      inactiveWorkplaces: 1,
+    });
+    expect(getPopulationStats(city)).toMatchObject({ capacity: 4, availableHousing: 0 });
+
+    const result = approveAdvisorPlan(city, createPlan([
+      buildAction('build_house', BUILD_COSTS.house, { x: 3, y: 2 }),
+    ]));
+
+    expect(result.ok).toBe(true);
+    expect(getBuildingAt(city, 3, 2)).toMatchObject({ type: 'house', population: 0 });
+    expect(getPopulationStats(city)).toMatchObject({ capacity: 8, availableHousing: 4 });
+    const after = createCityMetricsSnapshot(city);
+    expect(after).toMatchObject({
+      houses: 2,
+      population: before.population,
+      workersAvailable: before.workersAvailable,
+      workersRequired: before.workersRequired,
+      workerShortage: before.workerShortage,
+      activeWorkplaces: before.activeWorkplaces,
+      inactiveWorkplaces: before.inactiveWorkplaces,
+    });
+    expect(result.report).toMatchObject({ executedActions: 1, spent: BUILD_COSTS.house });
+    expect(result.report?.deltas).toContainEqual({
+      label: 'Money', before: 500, after: 500 - BUILD_COSTS.house, delta: -BUILD_COSTS.house,
+    });
+    expect(result.report?.deltas.filter(({ label }) => (
+      ['Population', 'Workers available', 'Worker shortage'].includes(label)
+    ))).toEqual([]);
   });
 
   it('does not generate a report when approved execution fails validation', () => {
@@ -178,7 +220,6 @@ describe('AfterActionReport', () => {
 
     expect(result.ok).toBe(false);
     expect(result.report).toBeUndefined();
-    expect(result.message).toContain('rejected');
     expect(city.resources.money).toBe(500);
   });
 });

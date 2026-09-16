@@ -1,3 +1,4 @@
+import { getHouseSpecification } from './HouseSpecification';
 import type { BuildingType, Tile } from './Tile';
 
 export const MAP_WIDTH = 30;
@@ -25,6 +26,7 @@ export interface Building {
   degradeProgress?: number;
   storedFood?: number;
   active?: boolean;
+  population?: number;
 }
 
 export interface ResourceState {
@@ -38,9 +40,14 @@ export interface FinanceState {
   lastNet: number;
 }
 
+export interface PopulationState {
+  lastChange: number;
+}
+
 export interface SimulationState {
   tick: number;
   finance: FinanceState;
+  population: PopulationState;
 }
 
 export interface CityState {
@@ -67,13 +74,16 @@ export function createCityState(): CityState {
     tiles,
     buildings: [],
     resources: { money: INITIAL_MONEY },
-    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
+    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 }, population: { lastChange: 0 } },
   };
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const buildingType = getSeedBuildingType(x, y);
-      if (buildingType) addBuilding(city, x, y, buildingType);
+      if (buildingType) {
+        const population = buildingType === 'house' ? getHouseSpecification(1).populationCapacity : undefined;
+        addBuilding(city, x, y, buildingType, population);
+      }
     }
   }
 
@@ -120,7 +130,7 @@ function getSeedBuildingType(x: number, y: number): BuildingType | undefined {
   return undefined;
 }
 
-function addBuilding(city: CityState, x: number, y: number, type: BuildingType): void {
+function addBuilding(city: CityState, x: number, y: number, type: BuildingType, initialPopulation?: number): void {
   const tile = getTile(city, x, y);
   if (!tile) return;
 
@@ -136,6 +146,7 @@ function addBuilding(city: CityState, x: number, y: number, type: BuildingType):
         hasFood: false,
         upgradeProgress: 0,
         degradeProgress: 0,
+        population: initialPopulation ?? 0,
       }
     : {
         id: `${type}-${x}-${y}`,

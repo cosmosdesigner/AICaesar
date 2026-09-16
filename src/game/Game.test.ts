@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CityState } from '../simulation/CityState';
+import { getPopulationStats } from '../simulation/Simulation';
 import { startGame } from './Game';
 
 type PointerHandler = (event: {
@@ -16,7 +18,7 @@ const doubles = vi.hoisted(() => ({
   advisorDestroy: vi.fn(),
   observe: vi.fn(),
   resizeObserverDisconnect: vi.fn(),
-  setInterval: vi.fn(() => 7),
+  setInterval: vi.fn((_callback: () => void) => 7),
   clearInterval: vi.fn(),
   rendererResize: vi.fn(),
   appRender: vi.fn(),
@@ -235,6 +237,39 @@ describe('startGame camera and cleanup', () => {
 
     doubles.buildPanelInstances[0]?.onReset();
     expect(map.fitCamera).toHaveBeenCalledTimes(2);
+  });
+
+  it('restores seed occupancy and clears population change when Reset follows simulation ticks', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const tick = doubles.setInterval.mock.calls[0]?.[0];
+    if (panel === undefined || tick === undefined) throw new Error('Expected game controls and timer.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    const houses = city.buildings.filter((building) => building.type === 'house');
+    const seedOccupancy = houses.map(({ x, y, level, population }) => ({ x, y, level, population }));
+    const seedStats = getPopulationStats(city);
+    expect(seedStats.population).toBeGreaterThan(0);
+    expect(seedStats.availableHousing).toBe(0);
+
+    for (const house of houses) house.population = 1;
+    for (let index = 0; index < 5; index++) tick();
+    expect(city.simulation.tick).toBe(5);
+    expect(getPopulationStats(city)).toMatchObject({
+      population: 0,
+      lastChange: -houses.length,
+    });
+
+    panel.onReset();
+    const resetCity = panel.update.mock.lastCall?.[0] as CityState;
+    expect(resetCity.simulation.tick).toBe(0);
+    expect(resetCity.buildings
+      .filter((building) => building.type === 'house')
+      .map(({ x, y, level, population }) => ({ x, y, level, population }))).toEqual(seedOccupancy);
+    expect(getPopulationStats(resetCity)).toEqual({ ...seedStats, lastChange: 0 });
+    cleanup();
   });
 
   it('refreshes overlays without resetting the camera', async () => {

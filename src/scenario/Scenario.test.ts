@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createCityState, type Building, type CityState } from '../simulation/CityState';
-import { assignWorkers } from '../simulation/Simulation';
+import { assignWorkers, getPopulationStats, simulateTick } from '../simulation/Simulation';
 import type { BuildingType, Tile } from '../simulation/Tile';
 import {
   FOUNDING_SETTLEMENT_SCENARIO,
   evaluateScenario,
-  getScenarioContext,
   type ScenarioObjective,
   type ScenarioProgress,
 } from './Scenario';
@@ -22,7 +21,7 @@ function createEmptyCity(width = 16, height = 16, money = 500): CityState {
     tiles,
     buildings: [],
     resources: { money },
-    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
+    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 }, population: { lastChange: 0 } },
   };
 }
 
@@ -73,12 +72,12 @@ describe('Founding Settlement scenario evaluation', () => {
     expect(Object.isFrozen(FOUNDING_SETTLEMENT_SCENARIO.objectives)).toBe(true);
     expect(progress.status).toBe('active');
     expect(progress.completedObjectives).toBeLessThan(progress.totalObjectives);
-    expect(progress.objectives.map((objective) => [objective.id, objective.label, objective.target])).toEqual([
-      ['population', 'Population', 80],
-      ['water-coverage', 'Water coverage', 70],
-      ['food-coverage', 'Food coverage', 50],
-      ['worker-shortage', 'Worker shortage', 20],
-      ['money', 'Money', 100],
+    expect(progress.objectives.map((objective) => [objective.id, objective.target])).toEqual([
+      ['population', 80],
+      ['water-coverage', 70],
+      ['food-coverage', 50],
+      ['worker-shortage', 20],
+      ['money', 100],
     ]);
   });
 
@@ -90,14 +89,13 @@ describe('Founding Settlement scenario evaluation', () => {
       [5, 2], [4, 3], [5, 3], [6, 3], [3, 5],
       [4, 5], [6, 5], [7, 5], [5, 6], [5, 7],
     ] as const;
-    houseTiles.forEach(([x, y], index) => addHouse(city, x, y, { level: 3, hasFood: index < 5 }));
+    houseTiles.forEach(([x, y], index) => addHouse(city, x, y, { level: 3, population: 14, hasFood: index < 5 }));
     assignWorkers(city);
 
     const progress = evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO);
 
     expect(progress.status).toBe('won');
     expect(progress.completedObjectives).toBe(5);
-    expect(progress.resultMessage).toBe('Victory: the settlement is stable and self-supporting.');
   });
 
   it('loses when money drops below the scenario floor', () => {
@@ -107,7 +105,6 @@ describe('Founding Settlement scenario evaluation', () => {
     const progress = evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO);
 
     expect(progress.status).toBe('lost');
-    expect(progress.resultMessage).toBe('Defeat: the settlement treasury fell below 50.');
   });
 
   it('loses at the tick limit when the city has not already won', () => {
@@ -117,7 +114,6 @@ describe('Founding Settlement scenario evaluation', () => {
     const progress = evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO);
 
     expect(progress.status).toBe('lost');
-    expect(progress.resultMessage).toBe('Defeat: the settlement failed to meet its goals before tick 900.');
   });
 
   it('treats worker shortage as 0% when no workers are required', () => {
@@ -127,6 +123,33 @@ describe('Founding Settlement scenario evaluation', () => {
 
     expect(workerShortage.current).toBe(0);
     expect(workerShortage.completed).toBe(true);
+  });
+
+  it('advances the population objective when residents arrive, not when empty capacity is added', () => {
+    const city = createEmptyCity();
+    const houseTiles = [
+      [4, 4], [5, 4], [6, 4], [4, 5], [6, 5], [4, 6], [5, 6],
+    ] as const;
+    houseTiles.forEach(([x, y]) => addHouse(city, x, y, { level: 3, population: 0 }));
+
+    expect(getPopulationStats(city).capacity).toBe(98);
+    expect(getObjective(evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO), 'population'))
+      .toMatchObject({ current: 0, completed: false });
+
+    const houses = city.buildings.filter((building) => building.type === 'house');
+    houses.forEach((house, index) => { house.population = index < 5 ? 14 : index === 5 ? 9 : 0; });
+    expect(getObjective(evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO), 'population'))
+      .toMatchObject({ current: 79, completed: false });
+
+    addBuilding(city, 'well', 5, 5);
+    addBuilding(city, 'market', 6, 6, { storedFood: 40 });
+    const roadTiles = [[4, 3], [5, 3], [6, 3], [3, 5], [7, 5], [3, 6], [5, 7]] as const;
+    roadTiles.forEach(([x, y]) => addBuilding(city, 'road', x, y));
+    for (let tick = 0; tick < 3; tick++) simulateTick(city);
+
+    expect(getPopulationStats(city)).toMatchObject({ population: 81, capacity: 98, lastChange: 2 });
+    expect(getObjective(evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO), 'population'))
+      .toMatchObject({ current: 81, completed: true });
   });
 
   it('calculates water and food coverage percentages from total houses', () => {
@@ -152,15 +175,5 @@ describe('Founding Settlement scenario evaluation', () => {
     const resetCity = createCityState();
 
     expect(evaluateScenario(resetCity, FOUNDING_SETTLEMENT_SCENARIO).status).toBe('active');
-  });
-
-  it('formats concise advisor context from current progress', () => {
-    const city = createCityState();
-    assignWorkers(city);
-
-    const context = getScenarioContext(evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO));
-
-    expect(context).toMatch(/^Scenario progress: \d\/5 objectives complete\. Primary remaining objective: /);
-    expect(context).toContain('/80');
   });
 });

@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 15 — economia mínima**: mapa isométrico 30×30, construção manual, seed determinístico com estrada/casas/poço/farm/granary/market, simulação pausável com velocidades 1x/2x/4x, overlays de água/comida, cenário **Found a functioning settlement**, advisor mock local por defeito, execução transacional validada de planos aprovados, relatório determinístico, navegação de câmara e balanço financeiro determinístico a cada 10 ticks.
+**Fase 18 — população dinâmica**: mapa isométrico 30×30, construção manual, seed determinístico com estrada/casas/poço/farm/granary/market, simulação pausável com velocidades 1x/2x/4x, população atual por casa com imigração/emigração gradual, workers e impostos derivados da ocupação, logística de comida **Farm → Granary → Market → House** da Fase 17, overlays de água/comida, cenário **Found a functioning settlement**, advisor mock local por defeito, execução transacional validada de planos aprovados, relatório determinístico, navegação de câmara e balanço financeiro determinístico a cada 10 ticks.
 
 ## Executar localmente
 
@@ -19,23 +19,26 @@ npm test
 npm run preview
 ```
 
-`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa os testes unitários Vitest do seed inicial, cenário, mapeamento de velocidade, câmera, analyzer, advisor mock, providers/fallback/schema, executor de ações, after-action reports e economia financeira mínima; `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui os assets temporários e não deve ser publicado.** Browser testing não foi executado nesta implementação da Fase 15.
+`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa os testes unitários Vitest do seed inicial, cenário, mapeamento de velocidade, câmera, analyzer, advisor mock, providers/fallback/schema, executor de ações, after-action reports, evolução/degradação de casas, logística de comida, população e economia financeira; `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui os assets temporários e não deve ser publicado.** Browser testing está fora do escopo da Fase 18.
 
 ## O que aparece
 
 - 900 tiles de relva numa grelha lógica 30×30.
 - Uma estrada central de 20 tiles, oito casas, um poço, uma farm, uma granary e um market, seedados de forma determinística e gratuitos.
-- Casas começam no nível 1; casas com estrada adjacente e cobertura de água evoluem para nível 2 após 3 ticks de serviço.
-- População deriva dos níveis das casas: nível 1 fornece 4 habitantes, nível 2 fornece 8 e nível 3 fornece 14.
-- Metade da população vira força de trabalho disponível; farms exigem 6 trabalhadores, granaries 4 e markets 5.
-- A atribuição é determinística por tick: granaries primeiro, depois farms e markets; workplaces sem trabalhadores suficientes ficam inativos.
-- Só farms ativas produzem 2 unidades de comida por tick; só granaries ativas adicionam 100 de capacidade; só markets ativos cobrem casas em raio Manhattan 4.
-- Casas cobertas por market ativo consomem 1 comida a cada 2 ticks enquanto houver stock e evoluem para nível 3 após 5 ticks de serviço alimentar.
-- A cada **10 ticks**, o balanço financeiro aplica impostos de casas menos upkeep de serviços/economia: casas nível 1/2/3 rendem **2/4/7** por período; well/farm/granary/market custam **1/3/3/3** por período; roads e houses não têm upkeep.
+- Casas começam no nível 1; as oito casas seedadas começam cheias, com 4 habitantes cada (32 no total), enquanto casas construídas pelo jogador ou advisor começam vazias. Casas com estrada adjacente e cobertura de água evoluem para nível 2 após 3 ticks de serviço.
+- População é o número de residentes atuais, não a capacidade: os níveis 1/2/3 permitem **4/8/14** habitantes por casa. Evoluir abre vagas sem criar residentes automaticamente.
+- Em ticks globais múltiplos de **3**, cada casa com estrada + água + comida ganha 1 habitante até à capacidade; em ticks globais múltiplos de **5**, cada casa à qual falte qualquer um desses serviços perde 1 habitante até zero. Não são contadores individuais desde a construção ou desde a chegada dos serviços.
+- A degradação limita imediatamente os residentes à nova capacidade. O saldo populacional do último tick inclui tanto imigração/emigração como perdas por esse limite.
+- A força de trabalho disponível é `floor(população atual × 0.5)`; farms exigem 6 trabalhadores, granaries 4 e markets 5. Construir uma casa vazia não disponibiliza workers imediatamente.
+- A atribuição é determinística por tick: granaries primeiro, depois farms e markets; workplaces sem trabalhadores suficientes ficam inativos. Workers são atribuídos antes da logística de comida e novamente após a atualização populacional, ficando disponíveis no mesmo tick em que os residentes chegam.
+- Só farms ativas produzem 2 unidades de comida por tick; só granaries ativas disponibilizam 100 de capacidade; só markets ativos com stock cobrem casas em raio Manhattan 4.
+- Casas cobertas por market ativo consomem 1 comida do seu stock a cada 2 ticks enquanto houver disponibilidade e evoluem para nível 3 após 5 ticks de serviço alimentar.
+- A cada **10 ticks**, após atualizar população e workers, o balanço financeiro aplica impostos de casas menos upkeep de serviços/economia: casas cheias nível 1/2/3 rendem **2/4/7** por período, casas vazias rendem **0** e casas parcialmente ocupadas rendem `ceil(imposto da casa cheia × população / capacidade)`; well/farm/granary/market custam **1/3/3/3** por período; roads e houses não têm upkeep.
 - Workplaces inativos continuam a pagar upkeep. O dinheiro pode ficar negativo por balanço financeiro, mas novas construções continuam bloqueadas quando o saldo não cobre o custo.
-- Overlays opcionais de água e comida, desenhados sem novos sprites, mostram cobertura de poços e markets ativos; no overlay de comida, casas sem comida recebem tint laranja.
+- Overlays opcionais de água e comida, desenhados sem novos sprites, mostram cobertura de poços e markets ativos com stock; no overlay de comida, casas sem comida recebem tint laranja.
 - O painel **Simulation** mostra **Running/Paused**, botão **Pause/Play** e velocidades **1x**, **2x** e **4x**; overlays, construção e painel financeiro continuam disponíveis quando pausado.
 - O painel **Finance** mostra período, impostos, upkeep, net, treasury e ticks até ao próximo balanço.
+- O painel mostra **População** atual/capacidade, **Available housing** (vagas), **Growth last tick** (saldo líquido total do último tick, com sinal) e as estatísticas existentes de workers.
 - Botões principais têm `title` simples para explicar construção, overlays, análise, aprovação, rejeição, reset, pausa/play e velocidade.
 - O analyzer determinístico resume tick, dinheiro, casas, água, comida e emprego, e gera issues ordenadas por severidade, tipo estável e número de tiles afetados.
 - O painel mostra os 3 principais problemas detetados, incluindo falta de água/comida, falta de produção/distribuição de comida, falta de trabalhadores, edifícios económicos sem estrada e dinheiro baixo; sem issues, mostra que não há problemas críticos.
@@ -51,29 +54,29 @@ npm run preview
 2. Ler o painel **Found a functioning settlement**: o cenário começa **Active** e mostra quantos objetivos já estão completos.
 3. Usar **Pause** para parar os ticks, alternar **Show water coverage** e **Show food coverage**, e confirmar que os overlays explicam água de wells e comida de markets ativos.
 4. Voltar a **Play** em **1x**, depois experimentar **2x** ou **4x** para acelerar produção, consumo, upgrades e avanço do limite de 900 ticks.
-5. Construir casas/serviços em tiles vazios e usar **Analyze city**/**Approve** para executar um plano validado. O advisor mostra a meta restante principal do cenário.
+5. Construir casas/serviços em tiles vazios e usar **Analyze city**/**Approve** para executar um plano validado. O advisor mostra a meta restante principal do cenário. Casas novas aumentam vagas, não residentes: observar os serviços e esperar pelos ticks de imigração para ganhar população/workers.
 6. Se todos os objetivos passarem, o estado vira **Victory**; se dinheiro cair abaixo de 50, inclusive por upkeep periódico, ou chegar ao tick 900 sem vitória, vira **Defeat**. Em ambos os casos, ticks, construção e aprovação ficam bloqueados.
-7. Clicar **Reset** para restaurar dinheiro, stocks de granary/market, tick 0, estado financeiro vazio, cidade seedada e cenário **Active**; pausa/velocidade ficam como estão para facilitar nova demonstração.
+7. Clicar **Reset** para restaurar dinheiro, stocks de granary/market, tick 0, estado financeiro vazio, cidade seedada com 32 residentes e saldo populacional do último tick 0, e cenário **Active**; pausa/velocidade ficam como estão para facilitar nova demonstração.
 
 ## Construção manual
 
 - Dinheiro inicial: **500** em `resources.money`; comida começa **0** em `storedFood` dos granaries e markets, sem stock global em recursos.
 - Selecionar **Road (4)**, **House (20)**, **Well (35)**, **Farm (45)**, **Granary (60)** ou **Market (50)** no painel; Road começa selecionada.
 - Clicar com o botão principal num tile vazio para construir. O dinheiro diminui pelo custo indicado.
-- Cada construção cria um `Building { id, type, x, y }`; casas também guardam `level`, `hasRoadAccess`, `hasWater`, `hasFood`, `upgradeProgress` e `degradeProgress`; workplaces (`farm`, `granary`, `market`) guardam `active`; granaries e markets guardam `storedFood` real.
-- Casas usam `src/simulation/HouseSpecification.ts` como fonte declarativa de capacidade, imposto, requisitos e ticks de evolução dos níveis 1–3: nível 1 tem capacidade 4/imposto 2 sem requisitos, nível 2 capacidade 8/imposto 4 com estrada+água e 3 ticks, nível 3 capacidade 14/imposto 7 com estrada+água+comida e 5 ticks. Perder requisitos durante 4 ticks degrada uma casa um nível por vez; recuperar serviços cancela a degradação pendente.
+- Cada construção cria um `Building { id, type, x, y }`; só casas guardam `population` (inteiro não negativo), além de `level`, `hasRoadAccess`, `hasWater`, `hasFood`, `upgradeProgress` e `degradeProgress`; workplaces (`farm`, `granary`, `market`) guardam `active`; granaries e markets guardam `storedFood` real. Casas novas têm `population: 0`.
+- Casas usam `src/simulation/HouseSpecification.ts` como única fonte de capacidade, imposto de ocupação completa, requisitos e ticks de evolução dos níveis 1–3: nível 1 tem capacidade 4/imposto máximo 2 sem requisitos de nível, nível 2 capacidade 8/imposto máximo 4 com estrada+água e 3 ticks, nível 3 capacidade 14/imposto máximo 7 com estrada+água+comida e 5 ticks. A capacidade não é guardada no `Building`. Perder requisitos durante 4 ticks degrada uma casa um nível por vez e limita logo a população à nova capacidade; recuperar serviços cancela a degradação pendente. Independentemente do nível, imigração exige estrada+água+comida.
 - Farms ativas depositam 2 comida/tick em granaries ativos (capacidade 100). Markets ativos procuram granaries ativos até raio Manhattan 8, reabastecem até 4/tick, têm capacidade 40 e só dão cobertura de comida no raio 4 quando `storedFood > 0`; casas consomem do market servido a cada 2 ticks.
-- O painel mostra dinheiro, ferramenta selecionada, tick, estatísticas de casas/água/comida, stock de granary, stock/demand de market, markets abastecidos, resumo de requisitos de casas bloqueadas por estrada/água/comida, casas em degradação, estatísticas de emprego, painel financeiro, toggles de overlay com labels claros, feedback da última ação e estado do cenário.
+- O painel mostra dinheiro, ferramenta selecionada, tick, estatísticas de casas/água/comida, stock de granary, stock/demand de market, markets abastecidos, resumo de requisitos de casas bloqueadas por estrada/água/comida, casas em degradação, população atual/capacidade, vagas, saldo populacional do último tick, estatísticas de emprego, painel financeiro, toggles de overlay com labels claros, feedback da última ação e estado do cenário. O tooltip de House explica que casas começam vazias e atraem residentes quando têm estrada, água e comida.
 - Tiles ocupados, coordenadas fora do mapa, dinheiro insuficiente e cenário terminado são rejeitados sem alterar cidade, saldo ou comida armazenada. O balanço financeiro pode tornar o saldo negativo; `placeBuilding` continua a validar o saldo disponível antes de construir.
-- **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `simulation.tick`, `simulation.finance`, edifícios iniciais com `storedFood: 0`, estado ativo/inativo recalculado e cenário **Active**; mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
+- **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `simulation.tick`, `simulation.finance`, edifícios iniciais com `storedFood: 0`, casas seedadas cheias no nível 1, `simulation.population.lastChange: 0`, estado ativo/inativo recalculado e cenário **Active**; mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
 
-O mapa completo é redesenhado após construção válida, execução válida do advisor, reset, tick de simulação, toggle de overlay ou redimensionamento. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Pan usa botão do meio ou **Space** + drag esquerdo sem construir ao soltar; zoom usa roda do rato ou botões e respeita limites. Não há rotação, demolição, walkers/pathfinding, commute, salários, tax collectors, migração, desirability, mini-map, inércia de câmara, múltiplos tipos de comida, backend, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial silenciosa, persistência de recomendações, arquivo de reports, campanhas, múltiplos cenários, eventos ou save/load.
+O mapa completo é redesenhado após construção válida, execução válida do advisor, reset, tick de simulação, toggle de overlay ou redimensionamento. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Pan usa botão do meio ou **Space** + drag esquerdo sem construir ao soltar; zoom usa roda do rato ou botões e respeita limites. Não há rotação, demolição, cidadãos individuais, walkers/pathfinding, rede de estradas para logística, commute, salários, tax collectors, nascimento/morte, classes sociais, happiness, imigração por mapa externo, desirability, mini-map, inércia de câmara, múltiplos tipos de comida, backend, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial silenciosa, persistência de recomendações, arquivo de reports, campanhas, múltiplos cenários, eventos ou save/load.
 
-Verificação manual: construir Road num tile vazio (saldo 496), selecionar House e clicar no mesmo tile (erro, saldo 496), construir Farm, Granary e Market em tiles vazios. Com poucas casas e workplaces demais, alguns workplaces ficam inativos; farms inativas não produzem, granaries inativas não recebem/fornecem stock e markets inativos ou vazios não dão cobertura de comida, mas todas continuam a pagar upkeep a cada 10 ticks. Reset deve restaurar saldo 500, stocks 0, tick 0, período financeiro 0 e a cidade seedada.
+Verificação manual: construir Road num tile vazio (saldo 496), selecionar House e clicar no mesmo tile (erro, saldo 496), construir Farm, Granary e Market em tiles vazios. Construir uma House aumenta capacidade/vagas, mas não residentes ou workers imediatamente. Com poucas casas ocupadas e workplaces demais, alguns workplaces ficam inativos; farms inativas não produzem, granaries inativas não recebem/fornecem stock e markets inativos ou vazios não dão cobertura de comida, mas todos continuam a pagar upkeep a cada 10 ticks. Inventários de edifícios inativos são preservados até voltarem a poder ser usados. Reset deve restaurar saldo 500, stocks 0, tick 0, período financeiro 0, 32 residentes em 32 lugares, saldo populacional 0 e a cidade seedada.
 
 ## Cenário
 
-`FOUNDING_SETTLEMENT_SCENARIO` vive em `src/scenario/Scenario.ts`. A definição é imutável e `evaluateScenario(city, definition)` deriva progresso apenas de `CityState`: população por `getWorkforceStats`, água/comida como percentagem de casas, falta de trabalhadores como percentagem de workers required (0% quando `workersRequired === 0`) e dinheiro por `resources.money`. Vitória exige todos os objetivos no mesmo tick. Derrota ocorre com `money < 50` ou `simulation.tick >= 900` sem vitória. Ao terminar, `Game.ts` pausa a simulação, bloqueia construção manual e bloqueia aprovação do advisor; **Reset** volta a avaliar uma cidade nova como **Active**.
+`FOUNDING_SETTLEMENT_SCENARIO` vive em `src/scenario/Scenario.ts`. A definição é imutável e `evaluateScenario(city, definition)` deriva progresso apenas de `CityState`: residentes atuais por `getWorkforceStats`, água/comida como percentagem de casas, falta de trabalhadores como percentagem de workers required (0% quando `workersRequired === 0`) e dinheiro por `resources.money`. Construir casas vazias não avança o objetivo de população nem resolve worker shortage imediatamente; esses valores mudam à medida que chegam ou saem residentes. Vitória exige todos os objetivos no mesmo tick. Derrota ocorre com `money < 50` ou `simulation.tick >= 900` sem vitória. Ao terminar, `Game.ts` pausa a simulação, bloqueia construção manual e bloqueia aprovação do advisor; **Reset** volta a avaliar uma cidade nova como **Active**.
 
 ## Advisor, providers e execução de ações
 
@@ -82,6 +85,8 @@ Verificação manual: construir Road num tile vazio (saldo 496), selecionar Hous
 `validatePlan(city, plan, approvedBudget)` e `executePlan(city, plan, approvedBudget)` vivem em `src/actions/`. O validator rejeita planos sem ações, tipos não suportados, targets ausentes, coordenadas fora do mapa, tiles ocupados, custo manipulado, orçamento insuficiente e dinheiro insuficiente sem mutar a cidade. O executor só muta depois de validar o plano completo; ações `build_*` são mapeadas para edifícios existentes e `wait` não altera dinheiro, tiles ou simulação. Texto vindo de LLM nunca é executado diretamente e nunca substitui `ActionValidator`/`ActionExecutor`.
 
 `createCityMetricsSnapshot(city)` e `createAfterActionReport(...)` vivem em `src/advisor/AfterActionReport.ts`. O snapshot registra dinheiro, comida/capacidade, cobertura de casas por água/comida, níveis de casas, população, trabalhadores, workplaces ativos/inativos e contagem de issues. `approveAdvisorPlan(city, plan)` captura snapshot antes da execução, executa via `ActionExecutor`, captura snapshot depois e só devolve `report` quando `executePlan` retorna sucesso; execução rejeitada mantém a mensagem de erro sem report enganador.
+
+O analyzer, o summary enviado ao advisor e os snapshots usam residentes atuais para população e workforce, não a capacidade das casas. O advisor pode continuar a sugerir `build_house`, sem novas actions: uma casa aprovada começa vazia, pelo que o report imediato não apresenta ganho de residentes/workers por essa construção. Os benefícios dependem dos serviços e dos ticks futuros; `wait` não avança ticks.
 
 ## Estrutura
 
@@ -102,7 +107,7 @@ src/
   rendering/MapRenderer.ts   Camadas, profundidade, overlays, refresh sem reset de câmera e aplicação de transform
   rendering/GridMath.ts      Conversão isométrica nos dois sentidos
   simulation/CityState.ts    Estado, seed, buildings[], resources, custos e validação de construção
-  simulation/Simulation.ts   Tick, água, comida ativa, emprego, acesso a estrada, evolução e estatísticas
+  simulation/Simulation.ts   Tick, logística de comida, serviços, evolução, população, emprego, impostos e estatísticas
   scenario/Scenario.ts      Definição imutável Founding Settlement, avaliação pura e contexto curto para advisor
   simulation/Tile.ts         Coordenadas, terreno e referência buildingId opcional
   ui/BuildPanel.ts           Painel HTML: ferramentas, custos, dinheiro, stats, top 3 issues, overlays, feedback, reset e bloqueio terminal
@@ -116,7 +121,11 @@ src/
 public/assets/prototype/    Apenas sete PNGs e aviso de licenciamento
 ```
 
-`gridToScreen` devolve o centro do losango em coordenadas locais do mapa, usando tiles de 120×60. `screenToGrid` recebe essas mesmas coordenadas locais, devolve o tile mais próximo e retorna `null` para valores não finitos. O input usa `map.toLocal(event.global)` antes da conversão, mantendo construção correta após pan/zoom; drag de pan é tratado antes da construção e não altera `CityState`. A roda do rato aplica zoom centrado no cursor com `preventDefault`, e **Center map** recalcula o enquadramento ideal para o viewport atual. `placeBuilding` em `CityState` valida coordenadas inteiras e limites, ocupação por `buildingId` e saldo em `resources.money` antes de qualquer mutação. `INITIAL_MONEY` e `BUILD_COSTS` nesse ficheiro configuram os custos. `simulation.tick` começa em 0 e é incrementado por `simulateTick` quando a simulação está em play; velocidades 1x, 2x e 4x usam intervalos de 1000ms, 500ms e 250ms. A economia de comida usa stock central em `resources.food`, capacidade derivada de granaries ativo…
+`gridToScreen` devolve o centro do losango em coordenadas locais do mapa, usando tiles de 120×60. `screenToGrid` recebe essas mesmas coordenadas locais, devolve o tile mais próximo e retorna `null` para valores não finitos. O input usa `map.toLocal(event.global)` antes da conversão, mantendo construção correta após pan/zoom; drag de pan é tratado antes da construção e não altera `CityState`. A roda do rato aplica zoom centrado no cursor com `preventDefault`, e **Center map** recalcula o enquadramento ideal para o viewport atual. `placeBuilding` em `CityState` valida coordenadas inteiras e limites, ocupação por `buildingId` e saldo em `resources.money` antes de qualquer mutação. `INITIAL_MONEY` e `BUILD_COSTS` nesse ficheiro configuram os custos.
+
+`simulation.tick` começa em 0 e é incrementado por `simulateTick` quando a simulação está em play; velocidades 1x, 2x e 4x usam intervalos de 1000ms, 500ms e 250ms. A ordem do tick é: incrementar tick → atribuir workers → produção farm/granary e reabastecimento de markets → calcular serviços/consumir comida → evoluir/degradar casas → limitar residentes à capacidade → aplicar imigração/emigração nos intervalos globais → guardar `simulation.population.lastChange` → reatribuir workers → aplicar finanças se for múltiplo de 10. `lastChange` é a diferença total de residentes entre início e fim do tick, incluindo perdas por degradação, não apenas migração.
+
+A logística da Fase 17 mantém comida exclusivamente em `storedFood` de granaries e markets, sem `resources.food`: farms depositam em qualquer granary ativo com espaço por ordem y/x/id, perdendo produção quando não há capacidade ativa. Markets procuram granaries ativos com stock em raio Manhattan 8, por distância e depois y/x/id; transferem até 4 unidades por tick, limitadas pelo stock e pela sua demanda (`max(0, 40 - storedFood)`). Casas são processadas por y/x/id e escolhem market ativo com stock em raio 4 por distância e depois y/x/id. Em ticks pares consomem 1 unidade; nos restantes, `hasFood` indica disponibilidade imediata. Não há percursos nem distâncias por rede de estradas nesta fase.
 
 ## Assets e documentação
 
@@ -140,5 +149,7 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 - [Plano da Fase 14](documentation/phase-14-development-plan.md)
 - [Plano da Fase 15](documentation/phase-15-development-plan.md)
 - [Plano da Fase 16](documentation/phase-16-development-plan.md)
+- [Plano da Fase 17](documentation/phase-17-development-plan.md)
+- [Plano da Fase 18](documentation/phase-18-development-plan.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)
