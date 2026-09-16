@@ -9,7 +9,7 @@ export const assetManifest = {
   well: `${base}well/well_00001.png`,
   farm: `${base}farm/vegfarm_00001.png`,
   granary: `${base}granary/warehouse_00001.png`,
-  market: `${base}market/marketkid_00001.png`,
+  market: `${base}market/commerce_00001.png`,
 } as const;
 
 export type MapTextures = Record<keyof typeof assetManifest, Texture>;

@@ -55,7 +55,7 @@ Verificação manual: construir Road num tile vazio (saldo 496), selecionar Hous
 
 ```text
 src/
-  analysis/CityAnalyzer.ts     Summary determinístico e issues ordenadas da cidade
+  analysis/CityAnalyzer.ts   Summary determinístico e issues ordenadas da cidade
   assets/AssetManifest.ts    URLs locais e carregamento das sete texturas
   game/Game.ts              Input PixiJS, construção, reset, loop de tick, resize e libertação
   rendering/PixiApp.ts       Canvas PixiJS
@@ -76,7 +76,7 @@ public/assets/prototype/    Apenas sete PNGs e aviso de licenciamento
 
 **Sprites temporários, apenas para prototipagem local. Direitos de redistribuição não verificados. Substituir antes de qualquer release pública.** Proveniência e seleção exata: [aviso dos assets](public/assets/prototype/README.md).
 
-A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na fonte contém indicadores de percurso. Farm usa `farm/vegfarm_00001.png`, granary usa temporariamente `warehouse/warehouse_00001.png`, e market usa temporariamente `marketkid/marketkid_00001.png` porque não há pasta `market/` adequada no clone local. Só os sete PNGs usados foram copiados, sem modificar os originais.
+A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na fonte contém indicadores de percurso. Farm usa `farm/vegfarm_00001.png`, granary usa temporariamente `warehouse/warehouse_00001.png`, e market usa `commerce/commerce_00001.png`, porque o sprite anterior `marketkid_00001.png` era um walker/personagem de 17×30 e ficava escalado incorretamente como edifício. Só os sete PNGs usados foram copiados, sem modificar os originais.
 
 - [Plano da Fase 1](documentation/phase-1-development-plan.md)
 - [Plano da Fase 2](documentation/phase-2-development-plan.md)
