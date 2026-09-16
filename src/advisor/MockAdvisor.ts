@@ -1,4 +1,4 @@
-import { analyzeCity, summarizeCity, type CityIssue } from '../analysis/CityAnalyzer';
+import { analyzeCity, summarizeCity, type CityIssue, type CityStateSummary } from '../analysis/CityAnalyzer';
 import { BUILD_COSTS, type CityState } from '../simulation/CityState';
 import type { BuildingType } from '../simulation/Tile';
 
@@ -50,8 +50,10 @@ const ACTION_LABELS: Readonly<Record<AdvisorActionType, string>> = {
 };
 
 export function createAdvisorPlan(city: CityState): AdvisorPlan {
-  const issues = analyzeCity(city);
-  const summary = summarizeCity(city);
+  return createMockAdvisorPlan(summarizeCity(city), analyzeCity(city));
+}
+
+export function createMockAdvisorPlan(summary: CityStateSummary, issues: readonly CityIssue[]): AdvisorPlan {
   const primaryIssue = issues[0];
 
   if (!primaryIssue) {
@@ -68,7 +70,7 @@ export function createAdvisorPlan(city: CityState): AdvisorPlan {
     });
   }
 
-  const action = createActionForIssue(city, primaryIssue);
+  const action = createActionForIssue(summary, primaryIssue);
   return createPlan({
     summary: `Primary issue: ${primaryIssue.explanation}`,
     reasoning: [
@@ -82,43 +84,42 @@ export function createAdvisorPlan(city: CityState): AdvisorPlan {
   });
 }
 
-function createActionForIssue(city: CityState, issue: CityIssue): AdvisorAction {
+function createActionForIssue(summary: CityStateSummary, issue: CityIssue): AdvisorAction {
   switch (issue.type) {
     case 'water_shortage':
       return createBuildAction(
         'build_well',
         'Place a deterministic mock well near the first affected house.',
-        getAdjacentTarget(city, issue.affectedTiles[0]),
+        getAdjacentTarget(issue.affectedTiles[0]),
       );
     case 'food_shortage':
     case 'food_production_shortage':
-      return createFoodAction(city, issue);
+      return createFoodAction(summary, issue);
     case 'food_distribution_shortage':
       return createBuildAction(
         'build_market',
         'Stored food exists, but houses need market coverage.',
-        getAdjacentTarget(city, issue.affectedTiles[0]),
+        getAdjacentTarget(issue.affectedTiles[0]),
       );
     case 'worker_shortage':
       return createBuildAction(
         'build_house',
         'More houses increase population and available workers.',
-        getAdjacentTarget(city, issue.affectedTiles[0]),
+        getAdjacentTarget(issue.affectedTiles[0]),
       );
     case 'road_access_missing':
       return createBuildAction(
         'build_road',
         'Add road access near the first affected economic building.',
-        getAdjacentTarget(city, issue.affectedTiles[0]),
+        getAdjacentTarget(issue.affectedTiles[0]),
       );
     case 'low_money':
       return createWaitAction('Money economy is not implemented enough for a safe automatic action.');
   }
 }
 
-function createFoodAction(city: CityState, issue: CityIssue): AdvisorAction {
-  const summary = summarizeCity(city);
-  const target = getAdjacentTarget(city, issue.affectedTiles[0]);
+function createFoodAction(summary: CityStateSummary, issue: CityIssue): AdvisorAction {
+  const target = getAdjacentTarget(issue.affectedTiles[0]);
 
   if (summary.foodCapacity === 0) {
     return createBuildAction('build_granary', 'Add storage capacity before scaling food supply.', target);
@@ -163,7 +164,6 @@ function createPlan(input: Omit<AdvisorPlan, 'estimatedCost'>): AdvisorPlan {
 }
 
 function getAdjacentTarget(
-  city: CityState,
   origin: { readonly x: number; readonly y: number } | undefined,
 ): { readonly x: number; readonly y: number } | undefined {
   if (!origin) return undefined;
@@ -175,9 +175,8 @@ function getAdjacentTarget(
     { x: origin.x, y: origin.y - 1 },
   ];
 
-  return candidates.find((candidate) => candidate.x >= 0 && candidate.y >= 0
-    && candidate.x < city.width && candidate.y < city.height)
-    ?? (origin.x >= 0 && origin.y >= 0 && origin.x < city.width && origin.y < city.height ? origin : undefined);
+  return candidates.find((candidate) => candidate.x >= 0 && candidate.y >= 0)
+    ?? (origin.x >= 0 && origin.y >= 0 ? origin : undefined);
 }
 
 function expectedImpactFor(issue: CityIssue, action: AdvisorAction): readonly string[] {
@@ -209,7 +208,7 @@ function risksFor(issue: CityIssue, action: AdvisorAction): readonly string[] {
   }
 
   return [
-    'Mock advisor does not validate occupancy, road access, or affordability in Phase 8.',
-    'Approve only records future intent and will not execute this action yet.',
+    'Provider plans are validated again for occupancy, access, affordability, and exact costs before execution.',
+    'Approve never executes advisor text directly; it only submits structured actions to the ActionExecutor.',
   ];
 }
