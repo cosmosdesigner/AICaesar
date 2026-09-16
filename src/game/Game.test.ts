@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startGame } from './Game';
 
+type PointerHandler = (event: {
+  readonly button: number;
+  readonly global: { readonly x: number; readonly y: number };
+  preventDefault: () => void;
+}) => void;
+
 const doubles = vi.hoisted(() => ({
   appDestroy: vi.fn(),
   buildPanelDestroy: vi.fn(),
+  cameraControlsDestroy: vi.fn(),
   scenarioPanelDestroy: vi.fn(),
   simulationControlsDestroy: vi.fn(),
   advisorDestroy: vi.fn(),
@@ -11,6 +18,30 @@ const doubles = vi.hoisted(() => ({
   resizeObserverDisconnect: vi.fn(),
   setInterval: vi.fn(() => 7),
   clearInterval: vi.fn(),
+  rendererResize: vi.fn(),
+  appRender: vi.fn(),
+  stageHandlers: new Map<string, PointerHandler>(),
+  windowHandlers: new Map<string, (event: KeyboardEvent) => void>(),
+  canvasHandlers: new Map<string, (event: WheelEvent) => void>(),
+  mapInstances: [] as Array<{
+    refresh: ReturnType<typeof vi.fn>;
+    applyCamera: ReturnType<typeof vi.fn>;
+    fitCamera: ReturnType<typeof vi.fn>;
+    toLocal: ReturnType<typeof vi.fn>;
+  }>,
+  buildPanelInstances: [] as Array<{
+    selectedTool: 'road';
+    update: ReturnType<typeof vi.fn>;
+    onReset: () => void;
+    onWaterOverlayToggle: () => boolean;
+    onFoodOverlayToggle: () => boolean;
+  }>,
+  cameraControlsInstances: [] as Array<{
+    onZoomIn: () => void;
+    onZoomOut: () => void;
+    onCenterMap: () => void;
+  }>,
+  resizeCallback: undefined as ResizeObserverCallback | undefined,
 }));
 
 vi.mock('pixi.js', () => ({
@@ -26,16 +57,27 @@ vi.mock('../assets/AssetManifest', () => ({
 
 vi.mock('../rendering/PixiApp', () => ({
   createPixiApp: vi.fn(async () => ({
+    canvas: {
+      addEventListener: vi.fn((event: string, handler: (event: WheelEvent) => void) => {
+        doubles.canvasHandlers.set(event, handler);
+      }),
+      removeEventListener: vi.fn((event: string) => {
+        doubles.canvasHandlers.delete(event);
+      }),
+      getBoundingClientRect: vi.fn(() => ({ left: 10, top: 20 })),
+    },
     stage: {
       addChild: vi.fn(),
-      on: vi.fn(),
+      on: vi.fn((event: string, handler: PointerHandler) => {
+        doubles.stageHandlers.set(event, handler);
+      }),
       eventMode: undefined,
       hitArea: undefined,
       cursor: undefined,
     },
     screen: { width: 800, height: 600 },
-    renderer: { resize: vi.fn() },
-    render: vi.fn(),
+    renderer: { resize: doubles.rendererResize },
+    render: doubles.appRender,
     destroy: doubles.appDestroy,
   })),
 }));
@@ -43,8 +85,17 @@ vi.mock('../rendering/PixiApp', () => ({
 vi.mock('../rendering/MapRenderer', () => ({
   MapRenderer: class MapRenderer {
     refresh = vi.fn();
-    fit = vi.fn();
-    toLocal = vi.fn();
+    applyCamera = vi.fn();
+    fitCamera = vi.fn(() => ({ x: 100, y: 50, zoom: 0.5 }));
+    toLocal = vi.fn((_global, _container, out) => {
+      out.x = 15;
+      out.y = 30;
+      return out;
+    });
+
+    constructor() {
+      doubles.mapInstances.push(this);
+    }
   },
 }));
 
@@ -58,9 +109,39 @@ vi.mock('../ui/BuildPanel', () => ({
     well: 'Well',
   },
   BuildPanel: class BuildPanel {
-    selectedTool = 'road';
+    selectedTool = 'road' as const;
     update = vi.fn();
     destroy = doubles.buildPanelDestroy;
+
+    constructor(
+      _host: HTMLElement,
+      onReset: () => void,
+      onWaterOverlayToggle: () => boolean,
+      onFoodOverlayToggle: () => boolean,
+    ) {
+      doubles.buildPanelInstances.push({
+        selectedTool: this.selectedTool,
+        update: this.update,
+        onReset,
+        onWaterOverlayToggle,
+        onFoodOverlayToggle,
+      });
+    }
+  },
+}));
+
+vi.mock('../ui/CameraControls', () => ({
+  CameraControls: class CameraControls {
+    destroy = doubles.cameraControlsDestroy;
+
+    constructor(
+      _host: HTMLElement,
+      onZoomIn: () => void,
+      onZoomOut: () => void,
+      onCenterMap: () => void,
+    ) {
+      doubles.cameraControlsInstances.push({ onZoomIn, onZoomOut, onCenterMap });
+    }
   },
 }));
 
@@ -85,16 +166,39 @@ vi.mock('../ui/AdvisorPanel', () => ({
   },
 }));
 
-describe('startGame cleanup', () => {
+function getMapRendererDouble() {
+  const map = doubles.mapInstances[0];
+  if (map === undefined) throw new Error('Expected MapRenderer to be constructed.');
+  return map;
+}
+
+describe('startGame camera and cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    doubles.stageHandlers.clear();
+    doubles.windowHandlers.clear();
+    doubles.canvasHandlers.clear();
+    doubles.mapInstances.length = 0;
+    doubles.buildPanelInstances.length = 0;
+    doubles.cameraControlsInstances.length = 0;
+    doubles.resizeCallback = undefined;
     vi.stubGlobal('ResizeObserver', class ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        doubles.resizeCallback = callback;
+      }
+
       observe = doubles.observe;
       disconnect = doubles.resizeObserverDisconnect;
     });
     vi.stubGlobal('window', {
       setInterval: doubles.setInterval,
       clearInterval: doubles.clearInterval,
+      addEventListener: vi.fn((event: string, handler: (event: KeyboardEvent) => void) => {
+        doubles.windowHandlers.set(event, handler);
+      }),
+      removeEventListener: vi.fn((event: string) => {
+        doubles.windowHandlers.delete(event);
+      }),
     });
   });
 
@@ -102,17 +206,104 @@ describe('startGame cleanup', () => {
     vi.unstubAllGlobals();
   });
 
-  it('destroys simulation controls with the other game UI', async () => {
+  it('destroys camera controls with the other game UI', async () => {
     const host = { clientWidth: 800, clientHeight: 600 } as HTMLElement;
     const panelHost = {} as HTMLElement;
 
     const cleanup = await startGame(host, panelHost);
     cleanup();
 
+    expect(doubles.cameraControlsDestroy).toHaveBeenCalledOnce();
     expect(doubles.simulationControlsDestroy).toHaveBeenCalledOnce();
     expect(doubles.buildPanelDestroy).toHaveBeenCalledOnce();
     expect(doubles.scenarioPanelDestroy).toHaveBeenCalledOnce();
     expect(doubles.advisorDestroy).toHaveBeenCalledOnce();
     expect(doubles.appDestroy).toHaveBeenCalledWith(true, { children: true });
+  });
+
+  it('fits on initial load and reset, but ordinary resize preserves the camera', async () => {
+    const host = { clientWidth: 800, clientHeight: 600 } as HTMLElement;
+    const panelHost = {} as HTMLElement;
+
+    await startGame(host, panelHost);
+    const map = getMapRendererDouble();
+    expect(map.fitCamera).toHaveBeenCalledOnce();
+
+    doubles.resizeCallback?.([], {} as ResizeObserver);
+    expect(map.fitCamera).toHaveBeenCalledOnce();
+    expect(map.applyCamera).toHaveBeenLastCalledWith({ x: 100, y: 50, zoom: 0.5 });
+
+    doubles.buildPanelInstances[0]?.onReset();
+    expect(map.fitCamera).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes overlays without resetting the camera', async () => {
+    const host = { clientWidth: 800, clientHeight: 600 } as HTMLElement;
+    const panelHost = {} as HTMLElement;
+
+    await startGame(host, panelHost);
+    const map = getMapRendererDouble();
+
+    expect(doubles.buildPanelInstances[0]?.onWaterOverlayToggle()).toBe(true);
+
+    expect(map.refresh).toHaveBeenCalled();
+    expect(map.fitCamera).toHaveBeenCalledOnce();
+  });
+
+  it('zooms with the wheel and camera controls', async () => {
+    const host = { clientWidth: 800, clientHeight: 600 } as HTMLElement;
+    const panelHost = {} as HTMLElement;
+
+    await startGame(host, panelHost);
+    const map = getMapRendererDouble();
+    const preventDefault = vi.fn();
+
+    doubles.canvasHandlers.get('wheel')?.({
+      clientX: 100,
+      clientY: 100,
+      deltaY: -1,
+      preventDefault,
+    } as unknown as WheelEvent);
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(map.applyCamera).toHaveBeenLastCalledWith({ x: 101, y: 47, zoom: 0.55 });
+
+    doubles.cameraControlsInstances[0]?.onCenterMap();
+    expect(map.fitCamera).toHaveBeenCalledTimes(2);
+  });
+
+  it('pans with Space plus left drag without building', async () => {
+    const host = { clientWidth: 800, clientHeight: 600 } as HTMLElement;
+    const panelHost = {} as HTMLElement;
+
+    await startGame(host, panelHost);
+    const map = getMapRendererDouble();
+    const preventDefault = vi.fn();
+
+    doubles.windowHandlers.get('keydown')?.({ code: 'Space', preventDefault } as unknown as KeyboardEvent);
+    doubles.stageHandlers.get('pointerdown')?.({ button: 0, global: { x: 100, y: 100 }, preventDefault });
+    doubles.stageHandlers.get('pointermove')?.({ button: 0, global: { x: 130, y: 150 }, preventDefault });
+    doubles.stageHandlers.get('pointerup')?.({ button: 0, global: { x: 130, y: 150 }, preventDefault });
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(map.toLocal).not.toHaveBeenCalled();
+    expect(map.applyCamera).toHaveBeenLastCalledWith({ x: 130, y: 100, zoom: 0.5 });
+  });
+
+  it('keeps ordinary left click construction using map-local coordinates', async () => {
+    const host = { clientWidth: 800, clientHeight: 600 } as HTMLElement;
+    const panelHost = {} as HTMLElement;
+
+    await startGame(host, panelHost);
+    const map = getMapRendererDouble();
+
+    doubles.stageHandlers.get('pointerdown')?.({
+      button: 0,
+      global: { x: 320, y: 180 },
+      preventDefault: vi.fn(),
+    });
+
+    expect(map.toLocal).toHaveBeenCalled();
+    expect(map.refresh).toHaveBeenCalled();
+    expect(map.fitCamera).toHaveBeenCalledOnce();
   });
 });

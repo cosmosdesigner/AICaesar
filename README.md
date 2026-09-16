@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 13 — scenario gameplay loop**: mapa isométrico 30×30, construção manual, seed determinístico com estrada/casas/poço/farm/granary/market, simulação pausável com velocidades 1x/2x/4x, overlays de água/comida, cenário **Found a functioning settlement** com objetivos simultâneos, vitória/derrota automáticas, analyzer determinístico, advisor mock local por defeito, execução transacional validada de planos aprovados e relatório determinístico de métricas antes/depois da execução.
+**Fase 14 — map navigation and camera**: mapa isométrico 30×30, construção manual, seed determinístico com estrada/casas/poço/farm/granary/market, simulação pausável com velocidades 1x/2x/4x, overlays de água/comida, cenário **Found a functioning settlement**, advisor mock local por defeito, execução transacional validada de planos aprovados, relatório determinístico e navegação de câmara com pan, zoom com limites e botão para recentrar/enquadrar o mapa.
 
 ## Executar localmente
 
@@ -19,7 +19,7 @@ npm test
 npm run preview
 ```
 
-`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa os testes unitários Vitest do seed inicial, cenário, mapeamento de velocidade, analyzer, advisor mock, providers/fallback/schema, executor de ações e after-action reports; `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui os assets temporários e não deve ser publicado.** Browser testing não foi executado nesta implementação da Fase 13.
+`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa os testes unitários Vitest do seed inicial, cenário, mapeamento de velocidade, câmera, analyzer, advisor mock, providers/fallback/schema, executor de ações e after-action reports; `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui os assets temporários e não deve ser publicado.** Browser testing não foi executado nesta implementação da Fase 14.
 
 ## O que aparece
 
@@ -39,7 +39,8 @@ npm run preview
 - O painel mostra os 3 principais problemas detetados, incluindo falta de água/comida, falta de produção/distribuição de comida, falta de trabalhadores, edifícios económicos sem estrada e dinheiro baixo; sem issues, mostra que não há problemas críticos.
 - O painel Advisor tem botão **Analyze city**; gera um `AdvisorPlan` de forma assíncrona via `AdvisorProvider`, mostra contexto determinístico do cenário sem enviar trabalho extra ao provider, mostra o provider usado (`mock` por defeito local, ou fallback quando configurado) e apresenta resumo, raciocínio, ações, custo estimado, impactos esperados e riscos. **Approve** valida orçamento aprovado, dinheiro, tipo, target, limites do mapa, ocupação e custo antes de executar builds via `placeBuilding`; quando a execução é bem-sucedida, mostra um after-action report com ações executadas, gasto, deltas de métricas reais e até 3 problemas remanescentes. **wait** é no-op válido; **Reject** limpa o plano. Com vitória/derrota, aprovação fica bloqueada até **Reset**.
 - Sprites reais da Caesaria, alinhados pela base do tile e ordenados de trás para a frente; casas nível 2 recebem tint clara e nível 3 tint verde.
-- Enquadramento automático de todo o mapa ao abrir ou redimensionar a janela.
+- Câmara centrada/enquadrada no arranque e em **Reset**; redimensionamento, construção, overlays, ticks e advisor preservam pan/zoom atuais.
+- Painel **Map navigation** com **Zoom in**, **Zoom out** e **Center map**, tooltips e ajuda curta: `Pan: middle-drag or Space + left-drag`; `Zoom: mouse wheel or controls`.
 
 
 ## Demo rápido de 5 minutos
@@ -62,7 +63,7 @@ npm run preview
 - Tiles ocupados, coordenadas fora do mapa, dinheiro insuficiente e cenário terminado são rejeitados sem alterar cidade, saldo ou comida.
 - **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `resources.food`, `simulation.tick`, edifícios iniciais, estado ativo/inativo recalculado e cenário **Active**; mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
 
-O mapa completo é redesenhado após construção válida, execução válida do advisor, reset, tick de simulação, toggle de overlay ou redimensionamento. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Não há pan/zoom, demolição, walkers/pathfinding, commute, salários, impostos, migração, desirability, múltiplos tipos de comida, backend, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial silenciosa, persistência de recomendações, arquivo de reports, campanhas, múltiplos cenários, eventos ou save/load.
+O mapa completo é redesenhado após construção válida, execução válida do advisor, reset, tick de simulação, toggle de overlay ou redimensionamento. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Pan usa botão do meio ou **Space** + drag esquerdo sem construir ao soltar; zoom usa roda do rato ou botões e respeita limites. Não há rotação, demolição, walkers/pathfinding, commute, salários, impostos, migração, desirability, mini-map, inércia de câmara, múltiplos tipos de comida, backend, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial silenciosa, persistência de recomendações, arquivo de reports, campanhas, múltiplos cenários, eventos ou save/load.
 
 Verificação manual: construir Road num tile vazio (saldo 496), selecionar House e clicar no mesmo tile (erro, saldo 496), construir Farm, Granary e Market em tiles vazios. Com poucas casas e workplaces demais, alguns workplaces ficam inativos; farms inativas não aumentam comida, granaries inativas não aumentam capacidade e markets inativos não dão cobertura de comida. Reset deve restaurar saldo 500, comida 0, tick 0 e a cidade seedada.
 
@@ -93,7 +94,8 @@ src/
   game/Game.ts              Input PixiJS, construção, reset, loop pausável, avaliação de cenário, resize e libertação
   game/SimulationSpeed.ts   Mapeamento 1x/2x/4x para intervalos de tick
   rendering/PixiApp.ts       Canvas PixiJS
-  rendering/MapRenderer.ts   Camadas, profundidade, overlays de água/comida, refresh e enquadramento
+  rendering/Camera.ts        Estado e matemática pura da câmara: clamp de zoom, zoom ancorado, pan e fitting
+  rendering/MapRenderer.ts   Camadas, profundidade, overlays, refresh sem reset de câmera e aplicação de transform
   rendering/GridMath.ts      Conversão isométrica nos dois sentidos
   simulation/CityState.ts    Estado, seed, buildings[], resources, custos e validação de construção
   simulation/Simulation.ts   Tick, água, comida ativa, emprego, acesso a estrada, evolução e estatísticas
@@ -101,6 +103,7 @@ src/
   simulation/Tile.ts         Coordenadas, terreno e referência buildingId opcional
   ui/BuildPanel.ts           Painel HTML: ferramentas, custos, dinheiro, stats, top 3 issues, overlays, feedback, reset e bloqueio terminal
   ui/SimulationControls.ts   Painel HTML de pause/play e velocidade 1x/2x/4x
+  ui/CameraControls.ts       Painel HTML de zoom in/out, Center map e ajuda curta de navegação
   ui/ScenarioPanel.ts        Painel HTML do cenário: briefing, objetivos, progresso, ticks e resultado
   ui/ObjectivesPanel.ts      Painel estático legado com objetivos do fluxo MVP
   ui/AdvisorPanel.ts         Painel HTML do advisor: contexto do cenário, Analyze city, plano, Approve bloqueável, after-action report e Reject
@@ -109,7 +112,7 @@ src/
 public/assets/prototype/    Apenas sete PNGs e aviso de licenciamento
 ```
 
-`gridToScreen` devolve o centro do losango em coordenadas locais do mapa, usando tiles de 120×60. `screenToGrid` recebe essas mesmas coordenadas locais, devolve o tile mais próximo e retorna `null` para valores não finitos. O input usa `map.toLocal(event.global)` antes da conversão; `placeBuilding` em `CityState` valida coordenadas inteiras e limites, ocupação por `buildingId` e saldo em `resources.money` antes de qualquer mutação. `INITIAL_MONEY` e `BUILD_COSTS` nesse ficheiro configuram os custos. `simulation.tick` começa em 0 e é incrementado por `simulateTick` quando a simulação está em play; velocidades 1x, 2x e 4x usam intervalos de 1000ms, 500ms e 250ms. A economia de comida usa stock central em `resources.food`, capacidade derivada de granaries ativos, produção direta por farms ativas e cobertura por markets ativos sem walkers. População e força de trabalho são derivadas das casas, e `assignWorkers` marca `farm`, `granary` e `market` como ativos ou inativos de forma estável. O renderer deriva terreno de `city.tiles`, edifícios de `city.buildings` e coberturas de poços/markets ativos; refresh destrói os objetos visuais antigos sem destruir as texturas partilhadas.
+`gridToScreen` devolve o centro do losango em coordenadas locais do mapa, usando tiles de 120×60. `screenToGrid` recebe essas mesmas coordenadas locais, devolve o tile mais próximo e retorna `null` para valores não finitos. O input usa `map.toLocal(event.global)` antes da conversão, mantendo construção correta após pan/zoom; drag de pan é tratado antes da construção e não altera `CityState`. A roda do rato aplica zoom centrado no cursor com `preventDefault`, e **Center map** recalcula o enquadramento ideal para o viewport atual. `placeBuilding` em `CityState` valida coordenadas inteiras e limites, ocupação por `buildingId` e saldo em `resources.money` antes de qualquer mutação. `INITIAL_MONEY` e `BUILD_COSTS` nesse ficheiro configuram os custos. `simulation.tick` começa em 0 e é incrementado por `simulateTick` quando a simulação está em play; velocidades 1x, 2x e 4x usam intervalos de 1000ms, 500ms e 250ms. A economia de comida usa stock central em `resources.food`, capacidade derivada de granaries ativo…
 
 ## Assets e documentação
 
@@ -130,5 +133,6 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 - [Plano da Fase 11](documentation/phase-11-development-plan.md)
 - [Plano da Fase 12](documentation/phase-12-development-plan.md)
 - [MVP](documentation/mvp.md)
+- [Plano da Fase 14](documentation/phase-14-development-plan.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)

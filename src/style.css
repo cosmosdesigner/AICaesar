@@ -18,6 +18,7 @@ main { padding: 0 16px; }
 .build-panel,
 .advisor-panel,
 .simulation-controls,
+.camera-controls,
 .objectives-panel,
 .scenario-panel {
   display: flex;
@@ -39,6 +40,7 @@ main { padding: 0 16px; }
 .advisor-panel h2,
 .advisor-panel h3,
 .simulation-controls h2,
+.camera-controls h2,
 .objectives-panel h2,
 .scenario-panel h2 {
   margin: 0;
@@ -73,7 +75,8 @@ main { padding: 0 16px; }
   margin-top: 6px;
 }
 .advisor-controls,
-.speed-controls {
+.speed-controls,
+.camera-control-buttons {
   display: flex;
   flex-wrap: wrap;
   align-items: center;

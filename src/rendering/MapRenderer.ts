@@ -2,6 +2,7 @@ import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import type { MapTextures } from '../assets/AssetManifest';
 import type { Building, CityState } from '../simulation/CityState';
 import { getFoodCoveredTiles, getTileKey, getWaterCoveredTiles, isWorkplace } from '../simulation/Simulation';
+import { createFittedCamera, type CameraState } from './Camera';
 import { gridToScreen, TILE_HEIGHT, TILE_WIDTH } from './GridMath';
 
 export class MapRenderer extends Container {
@@ -55,18 +56,27 @@ export class MapRenderer extends Container {
     }
   }
 
+  applyCamera(camera: CameraState): void {
+    this.scale.set(camera.zoom);
+    this.position.set(camera.x, camera.y);
+  }
+
+  getCameraState(): CameraState {
+    return {
+      x: this.position.x,
+      y: this.position.y,
+      zoom: this.scale.x,
+    };
+  }
+
+  fitCamera(width: number, height: number): CameraState {
+    const camera = createFittedCamera(this.getLocalBounds(), { width, height });
+    this.applyCamera(camera);
+    return camera;
+  }
+
   fit(width: number, height: number): void {
-    const bounds = this.getLocalBounds();
-    const padding = 24;
-    const scale = Math.min(
-      Math.max(1, width - padding * 2) / bounds.width,
-      Math.max(1, height - padding * 2) / bounds.height,
-    );
-    this.scale.set(scale);
-    this.position.set(
-      (width - bounds.width * scale) / 2 - bounds.x * scale,
-      (height - bounds.height * scale) / 2 - bounds.y * scale,
-    );
+    this.fitCamera(width, height);
   }
 
   private drawCoverageTile(graphics: Graphics, x: number, y: number, color: number, alpha: number): void {
