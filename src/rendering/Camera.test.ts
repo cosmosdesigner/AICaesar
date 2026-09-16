@@ -10,6 +10,11 @@ import {
 } from './Camera';
 
 describe('camera math', () => {
+  it('caps zoom at 2x so prototype sprites are not over-magnified', () => {
+    expect(MAX_CAMERA_ZOOM).toBe(2);
+    expect(clampCameraZoom(2.5)).toBe(2);
+  });
+
   it('clamps zoom to supported navigation limits', () => {
     expect(clampCameraZoom(MIN_CAMERA_ZOOM / 10)).toBe(MIN_CAMERA_ZOOM);
     expect(clampCameraZoom(MAX_CAMERA_ZOOM * 10)).toBe(MAX_CAMERA_ZOOM);

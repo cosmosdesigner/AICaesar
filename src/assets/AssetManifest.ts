@@ -1,4 +1,4 @@
-import { Assets, type Texture } from 'pixi.js';
+import { Assets, type SCALE_MODE, type Texture } from 'pixi.js';
 
 const base = `${import.meta.env.BASE_URL}assets/prototype/`;
 
@@ -14,6 +14,22 @@ export const assetManifest = {
 
 export type MapTextures = Record<keyof typeof assetManifest, Texture>;
 
+export const PROTOTYPE_TEXTURE_SCALE_MODE: SCALE_MODE = 'nearest';
+
+export function configureNearestSampling(texture: Texture): Texture {
+  texture.source.scaleMode = PROTOTYPE_TEXTURE_SCALE_MODE;
+  texture.source.style.update();
+  return texture;
+}
+
+export function configureMapTextureSampling(textures: MapTextures): MapTextures {
+  for (const texture of Object.values(textures)) {
+    configureNearestSampling(texture);
+  }
+  return textures;
+}
+
+
 export async function loadMapTextures(): Promise<MapTextures> {
   const [grass, road, house, well, farm, granary, market] = await Promise.all([
     Assets.load<Texture>(assetManifest.grass),
@@ -24,5 +40,5 @@ export async function loadMapTextures(): Promise<MapTextures> {
     Assets.load<Texture>(assetManifest.granary),
     Assets.load<Texture>(assetManifest.market),
   ]);
-  return { grass, road, house, well, farm, granary, market };
+  return configureMapTextureSampling({ grass, road, house, well, farm, granary, market });
 }

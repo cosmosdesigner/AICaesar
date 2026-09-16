@@ -20,7 +20,7 @@ export interface ViewportSize {
 }
 
 export const MIN_CAMERA_ZOOM = 0.35;
-export const MAX_CAMERA_ZOOM = 2.5;
+export const MAX_CAMERA_ZOOM = 2;
 export const DEFAULT_CAMERA_PADDING = 24;
 
 export function clampCameraZoom(zoom: number): number {
