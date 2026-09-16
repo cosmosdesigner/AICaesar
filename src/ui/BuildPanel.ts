@@ -1,5 +1,5 @@
 import { BUILD_COSTS, type CityState } from '../simulation/CityState';
-import { getFoodStats, getHousingStats } from '../simulation/Simulation';
+import { getFoodStats, getHousingStats, getWorkforceStats } from '../simulation/Simulation';
 import type { BuildingType } from '../simulation/Tile';
 
 export const BUILD_LABELS: Readonly<Record<BuildingType, string>> = {
@@ -31,6 +31,14 @@ export class BuildPanel {
   private readonly granaries = document.createElement('strong');
   private readonly markets = document.createElement('strong');
   private readonly foodTiles = document.createElement('strong');
+  private readonly population = document.createElement('strong');
+  private readonly workersAvailable = document.createElement('strong');
+  private readonly workersRequired = document.createElement('strong');
+  private readonly workersAssigned = document.createElement('strong');
+  private readonly unemployedWorkers = document.createElement('strong');
+  private readonly workerShortage = document.createElement('strong');
+  private readonly activeWorkplaces = document.createElement('strong');
+  private readonly inactiveWorkplaces = document.createElement('strong');
   private readonly waterOverlay = document.createElement('button');
   private readonly foodOverlay = document.createElement('button');
   private readonly status = document.createElement('p');
@@ -85,6 +93,14 @@ export class BuildPanel {
       this.createStat('Granaries', this.granaries),
       this.createStat('Markets', this.markets),
       this.createStat('Tiles com comida', this.foodTiles),
+      this.createStat('População', this.population),
+      this.createStat('Trabalhadores disponíveis', this.workersAvailable),
+      this.createStat('Trabalhadores necessários', this.workersRequired),
+      this.createStat('Trabalhadores atribuídos', this.workersAssigned),
+      this.createStat('Desempregados', this.unemployedWorkers),
+      this.createStat('Falta de trabalhadores', this.workerShortage),
+      this.createStat('Workplaces ativos', this.activeWorkplaces),
+      this.createStat('Workplaces inativos', this.inactiveWorkplaces),
     );
 
     this.waterOverlay.type = 'button';
@@ -128,6 +144,7 @@ export class BuildPanel {
   update(city: CityState, message: string, waterOverlay: boolean, foodOverlay: boolean): void {
     const housingStats = getHousingStats(city);
     const foodStats = getFoodStats(city);
+    const workforceStats = getWorkforceStats(city);
     this.money.textContent = String(city.resources.money);
     this.tick.textContent = String(city.simulation.tick);
     this.housesTotal.textContent = String(housingStats.totalHouses);
@@ -142,6 +159,14 @@ export class BuildPanel {
     this.granaries.textContent = String(foodStats.granaries);
     this.markets.textContent = String(foodStats.markets);
     this.foodTiles.textContent = String(foodStats.foodCoveredTiles);
+    this.population.textContent = String(workforceStats.population);
+    this.workersAvailable.textContent = String(workforceStats.workersAvailable);
+    this.workersRequired.textContent = String(workforceStats.workersRequired);
+    this.workersAssigned.textContent = String(workforceStats.workersAssigned);
+    this.unemployedWorkers.textContent = String(workforceStats.unemployedWorkers);
+    this.workerShortage.textContent = String(workforceStats.workerShortage);
+    this.activeWorkplaces.textContent = String(workforceStats.activeWorkplaces);
+    this.inactiveWorkplaces.textContent = String(workforceStats.inactiveWorkplaces);
     this.setWaterOverlay(waterOverlay);
     this.setFoodOverlay(foodOverlay);
     this.status.textContent = message;

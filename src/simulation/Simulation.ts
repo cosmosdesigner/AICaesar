@@ -1,4 +1,5 @@
 import { getBuildingAt, getTile, type Building, type CityState } from './CityState';
+import type { BuildingType } from './Tile';
 
 export const WATER_RADIUS = 3;
 export const MARKET_FOOD_RADIUS = 4;
@@ -7,6 +8,26 @@ export const GRANARY_CAPACITY = 100;
 export const HOUSE_LEVEL_2_TICKS = 3;
 export const HOUSE_LEVEL_3_TICKS = 5;
 export const HOUSE_FOOD_CONSUMPTION_INTERVAL = 2;
+
+type WorkplaceType = 'farm' | 'granary' | 'market';
+type WorkplaceBuilding = Building & { readonly type: WorkplaceType };
+
+export const HOUSE_POPULATION_BY_LEVEL: Readonly<Record<1 | 2 | 3, number>> = {
+  1: 4,
+  2: 8,
+  3: 14,
+};
+export const WORKFORCE_RATIO = 0.5;
+export const WORKERS_REQUIRED: Readonly<Record<WorkplaceType, number>> = {
+  farm: 6,
+  granary: 4,
+  market: 5,
+};
+const WORKPLACE_PRIORITY: Readonly<Record<WorkplaceType, number>> = {
+  granary: 0,
+  farm: 1,
+  market: 2,
+};
 
 export interface HousingStats {
   readonly totalHouses: number;
@@ -28,8 +49,20 @@ export interface FoodStats {
   readonly foodCoveredTiles: number;
 }
 
+export interface WorkforceStats {
+  readonly population: number;
+  readonly workersAvailable: number;
+  readonly workersRequired: number;
+  readonly workersAssigned: number;
+  readonly unemployedWorkers: number;
+  readonly workerShortage: number;
+  readonly activeWorkplaces: number;
+  readonly inactiveWorkplaces: number;
+}
+
 export function simulateTick(city: CityState): void {
   city.simulation.tick += 1;
+  assignWorkers(city);
   produceFood(city);
 
   const waterCoverage = getWaterCoveredTiles(city);
@@ -57,6 +90,7 @@ export function simulateTick(city: CityState): void {
   }
 
   if (shouldConsumeFood) city.resources.food = availableFood;
+  assignWorkers(city);
 }
 
 export function hasAdjacentRoad(city: CityState, building: Building): boolean {
@@ -75,11 +109,75 @@ export function getWaterCoveredTiles(city: CityState): Set<string> {
 }
 
 export function getFoodCoveredTiles(city: CityState): Set<string> {
-  return getRadiusCoverage(city, 'market', MARKET_FOOD_RADIUS);
+  return getRadiusCoverage(city, 'market', MARKET_FOOD_RADIUS, true);
 }
 
 export function getFoodCapacity(city: CityState): number {
-  return countBuildings(city, 'granary') * GRANARY_CAPACITY;
+  return countActiveBuildings(city, 'granary') * GRANARY_CAPACITY;
+}
+
+export function assignWorkers(city: CityState): void {
+  let remainingWorkers = Math.floor(getPopulation(city) * WORKFORCE_RATIO);
+  const workplaces = getSortedWorkplaces(city);
+
+  for (const workplace of workplaces) {
+    const workersRequired = getWorkersRequired(workplace.type);
+    if (remainingWorkers >= workersRequired) {
+      workplace.active = true;
+      remainingWorkers -= workersRequired;
+    } else {
+      workplace.active = false;
+    }
+  }
+}
+
+export function getPopulation(city: CityState): number {
+  return city.buildings.reduce((population, building) => {
+    if (building.type !== 'house') return population;
+    const level = Math.min(Math.max(building.level ?? 1, 1), 3) as 1 | 2 | 3;
+    return population + HOUSE_POPULATION_BY_LEVEL[level];
+  }, 0);
+}
+
+export function getWorkforceStats(city: CityState): WorkforceStats {
+  const population = getPopulation(city);
+  const workersAvailable = Math.floor(population * WORKFORCE_RATIO);
+  let remainingWorkers = workersAvailable;
+  let workersRequired = 0;
+  let workersAssigned = 0;
+  let activeWorkplaces = 0;
+  let inactiveWorkplaces = 0;
+
+  for (const workplace of getSortedWorkplaces(city)) {
+    const required = getWorkersRequired(workplace.type);
+    workersRequired += required;
+    if (remainingWorkers >= required) {
+      remainingWorkers -= required;
+      workersAssigned += required;
+      activeWorkplaces += 1;
+    } else {
+      inactiveWorkplaces += 1;
+    }
+  }
+
+  return {
+    population,
+    workersAvailable,
+    workersRequired,
+    workersAssigned,
+    unemployedWorkers: Math.max(0, workersAvailable - workersAssigned),
+    workerShortage: Math.max(0, workersRequired - workersAvailable),
+    activeWorkplaces,
+    inactiveWorkplaces,
+  };
+}
+
+export function isWorkplace(type: BuildingType): type is WorkplaceType {
+  return type === 'farm' || type === 'granary' || type === 'market';
+}
+
+export function getWorkersRequired(type: BuildingType): number {
+  return isWorkplace(type) ? WORKERS_REQUIRED[type] : 0;
 }
 
 export function getHousingStats(city: CityState): HousingStats {
@@ -141,7 +239,7 @@ function produceFood(city: CityState): void {
 
   city.resources.food = Math.min(
     capacity,
-    city.resources.food + countBuildings(city, 'farm') * FARM_FOOD_PER_TICK,
+    city.resources.food + countActiveBuildings(city, 'farm') * FARM_FOOD_PER_TICK,
   );
 }
 
@@ -178,11 +276,17 @@ function getWaterCoverage(city: CityState): Set<string> {
   return getRadiusCoverage(city, 'well', WATER_RADIUS);
 }
 
-function getRadiusCoverage(city: CityState, sourceType: Building['type'], radius: number): Set<string> {
+function getRadiusCoverage(
+  city: CityState,
+  sourceType: Building['type'],
+  radius: number,
+  activeOnly = false,
+): Set<string> {
   const coverage = new Set<string>();
 
   for (const building of city.buildings) {
     if (building.type !== sourceType) continue;
+    if (activeOnly && building.active !== true) continue;
 
     for (let dy = -radius; dy <= radius; dy++) {
       const remainingRadius = radius - Math.abs(dy);
@@ -199,4 +303,22 @@ function getRadiusCoverage(city: CityState, sourceType: Building['type'], radius
 
 function countBuildings(city: CityState, type: Building['type']): number {
   return city.buildings.reduce((total, building) => total + (building.type === type ? 1 : 0), 0);
+}
+
+function countActiveBuildings(city: CityState, type: Building['type']): number {
+  return city.buildings.reduce((total, building) => (
+    total + (building.type === type && building.active === true ? 1 : 0)
+  ), 0);
+}
+
+
+function getSortedWorkplaces(city: CityState): WorkplaceBuilding[] {
+  return city.buildings
+    .filter((building): building is WorkplaceBuilding => isWorkplace(building.type))
+    .sort((a, b) => (
+      WORKPLACE_PRIORITY[a.type] - WORKPLACE_PRIORITY[b.type]
+      || a.y - b.y
+      || a.x - b.x
+      || a.id.localeCompare(b.id)
+    ));
 }

@@ -4,11 +4,12 @@ import { screenToGrid } from '../rendering/GridMath';
 import { MapRenderer } from '../rendering/MapRenderer';
 import { createPixiApp } from '../rendering/PixiApp';
 import { createCityState, placeBuilding, type BuildResult } from '../simulation/CityState';
-import { simulateTick } from '../simulation/Simulation';
+import { assignWorkers, simulateTick } from '../simulation/Simulation';
 import { BuildPanel, BUILD_LABELS } from '../ui/BuildPanel';
 
 export async function startGame(host: HTMLElement, panelHost: HTMLElement): Promise<() => void> {
   let city = createCityState();
+  assignWorkers(city);
   let waterOverlay = false;
   let foodOverlay = false;
   const textures = await loadMapTextures();
@@ -19,6 +20,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     panelHost,
     () => {
       city = createCityState();
+      assignWorkers(city);
       map.refresh(city, { waterOverlay, foodOverlay });
       resize();
       panel.update(city, 'Cidade, dinheiro e simulação inicial restaurados.', waterOverlay, foodOverlay);
@@ -53,6 +55,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     const tile = screenToGrid(local.x, local.y);
     const result = tile ? placeBuilding(city, tile.x, tile.y, panel.selectedTool) : 'outside-map';
     if (result === 'built') {
+      assignWorkers(city);
       map.refresh(city, { waterOverlay, foodOverlay });
       resize();
     }

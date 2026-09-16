@@ -23,6 +23,7 @@ export interface Building {
   hasFood?: boolean;
   upgradeProgress?: number;
   storedFood?: number;
+  active?: boolean;
 }
 
 export interface ResourceState {
@@ -129,6 +130,7 @@ function addBuilding(city: CityState, x: number, y: number, type: BuildingType):
         type,
         x,
         y,
+        ...(type === 'farm' || type === 'granary' || type === 'market' ? { active: false } : {}),
         ...(type === 'granary' ? { storedFood: 0 } : {}),
       };
   tile.buildingId = building.id;

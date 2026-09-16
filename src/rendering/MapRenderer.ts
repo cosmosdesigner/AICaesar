@@ -1,7 +1,7 @@
 import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import type { MapTextures } from '../assets/AssetManifest';
 import type { Building, CityState } from '../simulation/CityState';
-import { getFoodCoveredTiles, getTileKey, getWaterCoveredTiles } from '../simulation/Simulation';
+import { getFoodCoveredTiles, getTileKey, getWaterCoveredTiles, isWorkplace } from '../simulation/Simulation';
 import { gridToScreen, TILE_HEIGHT, TILE_WIDTH } from './GridMath';
 
 export class MapRenderer extends Container {
@@ -92,6 +92,10 @@ export class MapRenderer extends Container {
       } else if (level >= 2) {
         sprite.tint = 0xffe2a0;
       }
+    }
+    if (isWorkplace(building.type) && building.active !== true) {
+      sprite.alpha = 0.55;
+      sprite.tint = 0xb06a6a;
     }
     return sprite;
   }
