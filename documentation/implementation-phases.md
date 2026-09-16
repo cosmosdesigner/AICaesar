@@ -810,7 +810,139 @@ Transformar sistemas em jogo equilibrado.
 - cenário 3 testa resiliência;
 - uma sessão de 30 minutos tem progressão clara.
 
-## 31. Próximo passo recomendado
+## 31. Fonte de inspiração Caesaria
+
+O clone local da Caesaria permanece disponível em:
+
+```text
+/root/caesaria-game-inspect
+```
+
+Para este projeto pessoal, podemos usar a Caesaria como referência prática de mecânicas, dados e sprites temporários.
+
+### Ficheiros úteis para mecânicas
+
+Habitação/evolução:
+
+```text
+/root/caesaria-game-inspect/source/objects/house.cpp
+/root/caesaria-game-inspect/source/objects/house.hpp
+/root/caesaria-game-inspect/source/objects/house_spec.cpp
+/root/caesaria-game-inspect/source/objects/house_spec.hpp
+/root/caesaria-game-inspect/source/objects/house_level.hpp
+/root/caesaria-game-inspect/source/objects/house_habitants.cpp
+/root/caesaria-game-inspect/source/events/updatehouseservice.cpp
+```
+
+Ideias a aproveitar:
+
+- níveis de casa definidos por requisitos;
+- serviços como valores acumulados/decrescentes;
+- evolução/degradação baseada em requisitos;
+- população ligada ao tipo/nível de casa;
+- missing requirement explícito para explicar ao jogador.
+
+Mercado/comida/distribuição:
+
+```text
+/root/caesaria-game-inspect/source/objects/market.cpp
+/root/caesaria-game-inspect/source/objects/market.hpp
+/root/caesaria-game-inspect/source/walker/market_lady.cpp
+/root/caesaria-game-inspect/source/walker/market_buyer.cpp
+/root/caesaria-game-inspect/source/layers/market_access.cpp
+/root/caesaria-game-inspect/source/city/goods_updater.cpp
+/root/caesaria-game-inspect/source/good/good.cpp
+/root/caesaria-game-inspect/source/good/good.hpp
+```
+
+Ideias a aproveitar:
+
+- market tem storage próprio;
+- market buyer procura bens necessários;
+- distribuição depende de trabalhadores e distância/estrada;
+- goods têm capacidade e quantidade;
+- procura pode ser calculada por diferença entre capacidade e stock.
+
+Cenários/eventos:
+
+```text
+/root/caesaria-game-inspect/bin/resources/missions/*.mission
+/root/caesaria-game-inspect/bin/resources/missions/caesarea.mission
+```
+
+Ideias a aproveitar:
+
+- objetivos por população/prosperidade/cultura/paz/favor;
+- eventos por data;
+- alterações de preços;
+- pedidos do imperador;
+- trade routes e goods comprados/vendidos;
+- briefing/win text por cenário.
+
+Roads/walkers:
+
+```text
+/root/caesaria-game-inspect/source/walker/walker.cpp
+/root/caesaria-game-inspect/source/walker/walker.hpp
+/root/caesaria-game-inspect/source/walker/walkers_factory.cpp
+/root/caesaria-game-inspect/source/city/walkergrid.cpp
+/root/caesaria-game-inspect/source/city/walkergrid.hpp
+```
+
+Ideias a aproveitar:
+
+- walkers como feedback visual;
+- primeiro usar distância por road graph como fonte de verdade;
+- walkers visuais podem vir depois sem controlar a simulação.
+
+### Assets úteis
+
+Sprites temporários continuam em:
+
+```text
+/root/caesaria-game-inspect/resources
+```
+
+Pastas mais úteis para próximas fases:
+
+```text
+houses/
+commerce/
+warehouse/
+farm/
+fountain/
+gardens/
+plaza/
+prefecture/
+engineering/
+well/
+way/
+ground/
+marketlady/
+marketkid/
+```
+
+Uso recomendado:
+
+- copiar apenas assets necessários para `public/assets/prototype/`;
+- manter nomes de origem no README de assets;
+- evitar copiar pastas completas sem necessidade;
+- para protótipo pessoal, podemos avançar com estes sprites;
+- antes de release pública/comercial, substituir por arte própria ou assets com licença explícita.
+
+### Como isto muda o roadmap
+
+A partir da Fase 13, a Caesaria deve ser usada como fonte de design, não como código a portar diretamente.
+
+Regra prática:
+
+- observar mecânica na Caesaria;
+- reduzir para uma versão simples em AICaesar;
+- implementar de forma TypeScript idiomática;
+- manter sistemas pequenos e testáveis;
+- só aumentar fidelidade quando o loop de jogo pedir.
+
+## 32. Próximo passo recomendado
 
 A próxima fase a implementar deve ser a Fase 13: loop de jogo e objetivos de cenário.
 
