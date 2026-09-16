@@ -10,6 +10,8 @@ import type { CityState } from '../simulation/CityState';
 export interface AdvisorPanelOptions {
   readonly provider?: AdvisorProvider;
   readonly onApprovePlan?: (plan: AdvisorPlan) => AdvisorApprovalResult;
+  readonly getScenarioContext?: () => string;
+  readonly isApprovalBlocked?: () => boolean;
 }
 
 export class AdvisorPanel {
@@ -19,6 +21,7 @@ export class AdvisorPanel {
   private analysisRequest = 0;
   private readonly advisorProvider: AdvisorProvider;
   private readonly element = document.createElement('section');
+  private readonly scenarioContext = document.createElement('p');
   private readonly summary = document.createElement('p');
   private readonly provider = document.createElement('p');
   private readonly reasoning = document.createElement('ul');
@@ -27,6 +30,7 @@ export class AdvisorPanel {
   private readonly expectedImpact = document.createElement('ul');
   private readonly risks = document.createElement('ul');
   private readonly controls = document.createElement('div');
+  private readonly approve = document.createElement('button');
   private readonly status = document.createElement('p');
   private readonly reportSection = document.createElement('div');
   private readonly reportSummary = document.createElement('p');
@@ -55,13 +59,17 @@ export class AdvisorPanel {
       void this.analyzeCity();
     });
 
-    const approve = document.createElement('button');
-    approve.type = 'button';
-    approve.textContent = 'Approve';
-    approve.title = 'Approve and execute the current validated advisor plan.';
-    approve.addEventListener('click', () => {
+    this.approve.type = 'button';
+    this.approve.textContent = 'Approve';
+    this.approve.title = 'Approve and execute the current validated advisor plan.';
+    this.approve.addEventListener('click', () => {
       if (this.plan === undefined) {
         this.status.textContent = 'No advisor plan to approve.';
+        return;
+      }
+      if (this.options.isApprovalBlocked?.() === true) {
+        this.status.textContent = 'Advisor plan approval is blocked because the scenario has ended.';
+        this.updateScenarioContext();
         return;
       }
 
@@ -94,9 +102,10 @@ export class AdvisorPanel {
 
     this.summary.className = 'advisor-summary';
     this.controls.className = 'advisor-controls';
-    this.controls.append(approve, reject);
+    this.controls.append(this.approve, reject);
     this.status.className = 'advisor-status';
     this.status.setAttribute('role', 'status');
+    this.scenarioContext.className = 'advisor-scenario-context';
     this.status.textContent = 'No advisor plan generated yet.';
 
     const reportTitle = document.createElement('h3');
@@ -109,6 +118,7 @@ export class AdvisorPanel {
       title,
       analyze,
       this.summary,
+      this.scenarioContext,
       this.provider,
       this.createSection('Reasoning', this.reasoning),
       this.createSection('Actions', this.actions),
@@ -126,6 +136,11 @@ export class AdvisorPanel {
   destroy(): void {
     this.analysisRequest += 1;
     this.element.remove();
+  }
+
+  updateScenarioContext(): void {
+    this.scenarioContext.textContent = this.options.getScenarioContext?.() ?? '';
+    this.approve.disabled = this.options.isApprovalBlocked?.() === true;
   }
 
   private async analyzeCity(): Promise<void> {
@@ -166,6 +181,7 @@ export class AdvisorPanel {
     this.expectedImpact.replaceChildren();
     this.risks.replaceChildren();
     this.renderReport();
+    this.updateScenarioContext();
     this.controls.hidden = this.plan === undefined;
     if (!this.plan) {
       this.summary.textContent = 'Click Analyze city to generate an advisor provider plan.';

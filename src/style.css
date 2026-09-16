@@ -18,7 +18,8 @@ main { padding: 0 16px; }
 .build-panel,
 .advisor-panel,
 .simulation-controls,
-.objectives-panel {
+.objectives-panel,
+.scenario-panel {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -31,13 +32,15 @@ main { padding: 0 16px; }
   font-size: 14px;
 }
 .advisor-panel,
-.objectives-panel {
+.objectives-panel,
+.scenario-panel {
   align-items: flex-start;
 }
 .advisor-panel h2,
 .advisor-panel h3,
 .simulation-controls h2,
-.objectives-panel h2 {
+.objectives-panel h2,
+.scenario-panel h2 {
   margin: 0;
   font-size: 16px;
 }
@@ -50,13 +53,16 @@ main { padding: 0 16px; }
 }
 .advisor-panel ul,
 .advisor-panel ol,
-.objectives-panel ol {
+.objectives-panel ol,
+.scenario-panel ol {
   margin: 6px 0 0 20px;
   padding: 0;
 }
 .advisor-summary,
 .advisor-status,
-.advisor-panel > p {
+.advisor-scenario-context,
+.advisor-panel > p,
+.scenario-result {
   flex-basis: 100%;
 }
 .after-action-report {
@@ -75,6 +81,18 @@ main { padding: 0 16px; }
 }
 .advisor-status {
   min-height: 1.5em;
+  color: #d6c18b;
+}
+.scenario-panel {
+  align-items: flex-start;
+}
+.scenario-panel ol {
+  flex-basis: 100%;
+}
+.scenario-objective-complete {
+  color: #b9d68b;
+}
+.scenario-objective-incomplete {
   color: #d6c18b;
 }
 .build-tools { display: flex; flex-wrap: wrap; gap: 8px; }

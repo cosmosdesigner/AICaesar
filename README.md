@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 12 — polish MVP final**: mapa isométrico 30×30, construção manual, seed determinístico com estrada/casas/poço/farm/granary/market, simulação pausável com velocidades 1x/2x/4x, overlays de água/comida, painel de objetivos MVP, analyzer determinístico, advisor mock local por defeito, execução transacional validada de planos aprovados e relatório determinístico de métricas antes/depois da execução.
+**Fase 13 — scenario gameplay loop**: mapa isométrico 30×30, construção manual, seed determinístico com estrada/casas/poço/farm/granary/market, simulação pausável com velocidades 1x/2x/4x, overlays de água/comida, cenário **Found a functioning settlement** com objetivos simultâneos, vitória/derrota automáticas, analyzer determinístico, advisor mock local por defeito, execução transacional validada de planos aprovados e relatório determinístico de métricas antes/depois da execução.
 
 ## Executar localmente
 
@@ -19,7 +19,7 @@ npm test
 npm run preview
 ```
 
-`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa os testes unitários Vitest do seed inicial, mapeamento de velocidade, analyzer, advisor mock, providers/fallback/schema, executor de ações e after-action reports; `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui os assets temporários e não deve ser publicado.** Browser testing não foi executado nesta implementação da Fase 12.
+`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa os testes unitários Vitest do seed inicial, cenário, mapeamento de velocidade, analyzer, advisor mock, providers/fallback/schema, executor de ações e after-action reports; `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui os assets temporários e não deve ser publicado.** Browser testing não foi executado nesta implementação da Fase 13.
 
 ## O que aparece
 
@@ -33,11 +33,11 @@ npm run preview
 - Casas cobertas por market ativo consomem 1 comida a cada 2 ticks enquanto houver stock e evoluem para nível 3 após 5 ticks de serviço alimentar.
 - Overlays opcionais de água e comida, desenhados sem novos sprites, mostram cobertura de poços e markets ativos; no overlay de comida, casas sem comida recebem tint laranja.
 - O painel **Simulation** mostra **Running/Paused**, botão **Pause/Play** e velocidades **1x**, **2x** e **4x**; overlays e construção continuam disponíveis quando pausado.
-- O painel **MVP objectives** apresenta o fluxo curto da demo: observar casas, verificar água, ativar comida, manter trabalhadores, analisar a cidade, aprovar um plano e ler o report.
+- O painel **Found a functioning settlement** mostra briefing, estado **Active/Victory/Defeat**, tick atual/limite 900 e progresso atual/target dos objetivos: população 80, água 70%, comida 50%, falta de trabalhadores até 20% e dinheiro 100.
 - Botões principais têm `title` simples para explicar construção, overlays, análise, aprovação, rejeição, reset, pausa/play e velocidade.
 - O analyzer determinístico resume tick, dinheiro, casas, água, comida e emprego, e gera issues ordenadas por severidade, tipo estável e número de tiles afetados.
 - O painel mostra os 3 principais problemas detetados, incluindo falta de água/comida, falta de produção/distribuição de comida, falta de trabalhadores, edifícios económicos sem estrada e dinheiro baixo; sem issues, mostra que não há problemas críticos.
-- O painel Advisor tem botão **Analyze city**; gera um `AdvisorPlan` de forma assíncrona via `AdvisorProvider`, mostra o provider usado (`mock` por defeito local, ou fallback quando configurado) e apresenta resumo, raciocínio, ações, custo estimado, impactos esperados e riscos. **Approve** valida orçamento aprovado, dinheiro, tipo, target, limites do mapa, ocupação e custo antes de executar builds via `placeBuilding`; quando a execução é bem-sucedida, mostra um after-action report com ações executadas, gasto, deltas de métricas reais e até 3 problemas remanescentes. **wait** é no-op válido; **Reject** limpa o plano.
+- O painel Advisor tem botão **Analyze city**; gera um `AdvisorPlan` de forma assíncrona via `AdvisorProvider`, mostra contexto determinístico do cenário sem enviar trabalho extra ao provider, mostra o provider usado (`mock` por defeito local, ou fallback quando configurado) e apresenta resumo, raciocínio, ações, custo estimado, impactos esperados e riscos. **Approve** valida orçamento aprovado, dinheiro, tipo, target, limites do mapa, ocupação e custo antes de executar builds via `placeBuilding`; quando a execução é bem-sucedida, mostra um after-action report com ações executadas, gasto, deltas de métricas reais e até 3 problemas remanescentes. **wait** é no-op válido; **Reject** limpa o plano. Com vitória/derrota, aprovação fica bloqueada até **Reset**.
 - Sprites reais da Caesaria, alinhados pela base do tile e ordenados de trás para a frente; casas nível 2 recebem tint clara e nível 3 tint verde.
 - Enquadramento automático de todo o mapa ao abrir ou redimensionar a janela.
 
@@ -45,11 +45,12 @@ npm run preview
 ## Demo rápido de 5 minutos
 
 1. Abrir a app e observar o seed: estrada central, casas, poço, farm, granary e market já existem sem custo inicial.
-2. Usar **Pause** para parar os ticks, alternar **Show water coverage** e **Show food coverage**, e confirmar que os overlays explicam água de wells e comida de markets ativos.
-3. Voltar a **Play** em **1x**, depois experimentar **2x** ou **4x** para acelerar produção, consumo e upgrades.
-4. Construir uma casa perto da estrada ou adicionar serviços em tiles vazios, verificando saldo, trabalhadores e feedback do painel.
-5. Clicar **Analyze city** para gerar um plano local determinístico, ler impactos/risks, clicar **Approve** e comparar o after-action report.
-6. Clicar **Reset** para restaurar dinheiro, comida, tick 0 e a cidade seedada; pausa/velocidade ficam como estão para facilitar nova demonstração.
+2. Ler o painel **Found a functioning settlement**: o cenário começa **Active** e mostra quantos objetivos já estão completos.
+3. Usar **Pause** para parar os ticks, alternar **Show water coverage** e **Show food coverage**, e confirmar que os overlays explicam água de wells e comida de markets ativos.
+4. Voltar a **Play** em **1x**, depois experimentar **2x** ou **4x** para acelerar produção, consumo, upgrades e avanço do limite de 900 ticks.
+5. Construir casas/serviços em tiles vazios e usar **Analyze city**/**Approve** para executar um plano validado. O advisor mostra a meta restante principal do cenário.
+6. Se todos os objetivos passarem, o estado vira **Victory**; se dinheiro cair abaixo de 50 ou chegar ao tick 900 sem vitória, vira **Defeat**. Em ambos os casos, ticks, construção e aprovação ficam bloqueados.
+7. Clicar **Reset** para restaurar dinheiro, comida, tick 0, cidade seedada e cenário **Active**; pausa/velocidade ficam como estão para facilitar nova demonstração.
 
 ## Construção manual
 
@@ -57,13 +58,17 @@ npm run preview
 - Selecionar **Road (4)**, **House (20)**, **Well (35)**, **Farm (45)**, **Granary (60)** ou **Market (50)** no painel; Road começa selecionada.
 - Clicar com o botão principal num tile vazio para construir. O dinheiro diminui pelo custo indicado.
 - Cada construção cria um `Building { id, type, x, y }`; casas também guardam `level`, `hasRoadAccess`, `hasWater`, `hasFood` e `upgradeProgress`; workplaces (`farm`, `granary`, `market`) guardam `active` para feedback visual simples; granaries recebem `storedFood` temporário, com o stock efetivo centralizado em `resources.food`.
-- O painel mostra dinheiro, ferramenta selecionada, tick, estatísticas de casas/água/comida, estatísticas de emprego, toggles de overlay com labels claros, feedback da última ação e objetivos MVP.
-- Tiles ocupados, coordenadas fora do mapa e dinheiro insuficiente são rejeitados sem alterar cidade, saldo ou comida.
-- **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `resources.food`, `simulation.tick`, edifícios iniciais e estado ativo/inativo recalculado; mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
+- O painel mostra dinheiro, ferramenta selecionada, tick, estatísticas de casas/água/comida, estatísticas de emprego, toggles de overlay com labels claros, feedback da última ação e estado do cenário.
+- Tiles ocupados, coordenadas fora do mapa, dinheiro insuficiente e cenário terminado são rejeitados sem alterar cidade, saldo ou comida.
+- **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `resources.food`, `simulation.tick`, edifícios iniciais, estado ativo/inativo recalculado e cenário **Active**; mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
 
-O mapa completo é redesenhado após construção válida, execução válida do advisor, reset, tick de simulação, toggle de overlay ou redimensionamento. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Não há pan/zoom, demolição, walkers/pathfinding, commute, salários, impostos, migração, desirability, múltiplos tipos de comida, backend, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial silenciosa, persistência de recomendações ou arquivo de reports.
+O mapa completo é redesenhado após construção válida, execução válida do advisor, reset, tick de simulação, toggle de overlay ou redimensionamento. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Não há pan/zoom, demolição, walkers/pathfinding, commute, salários, impostos, migração, desirability, múltiplos tipos de comida, backend, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial silenciosa, persistência de recomendações, arquivo de reports, campanhas, múltiplos cenários, eventos ou save/load.
 
 Verificação manual: construir Road num tile vazio (saldo 496), selecionar House e clicar no mesmo tile (erro, saldo 496), construir Farm, Granary e Market em tiles vazios. Com poucas casas e workplaces demais, alguns workplaces ficam inativos; farms inativas não aumentam comida, granaries inativas não aumentam capacidade e markets inativos não dão cobertura de comida. Reset deve restaurar saldo 500, comida 0, tick 0 e a cidade seedada.
+
+## Cenário
+
+`FOUNDING_SETTLEMENT_SCENARIO` vive em `src/scenario/Scenario.ts`. A definição é imutável e `evaluateScenario(city, definition)` deriva progresso apenas de `CityState`: população por `getWorkforceStats`, água/comida como percentagem de casas, falta de trabalhadores como percentagem de workers required (0% quando `workersRequired === 0`) e dinheiro por `resources.money`. Vitória exige todos os objetivos no mesmo tick. Derrota ocorre com `money < 50` ou `simulation.tick >= 900` sem vitória. Ao terminar, `Game.ts` pausa a simulação, bloqueia construção manual e bloqueia aprovação do advisor; **Reset** volta a avaliar uma cidade nova como **Active**.
 
 ## Advisor, providers e execução de ações
 
@@ -85,18 +90,20 @@ src/
   actions/ActionValidator.ts Validator puro de AdvisorPlan sem mutar a cidade
   actions/ActionExecutor.ts  Executor transacional simples: valida, constrói e recalcula trabalhadores
   assets/AssetManifest.ts    URLs locais e carregamento das sete texturas
-  game/Game.ts              Input PixiJS, construção, reset, loop pausável de tick, resize e libertação
+  game/Game.ts              Input PixiJS, construção, reset, loop pausável, avaliação de cenário, resize e libertação
   game/SimulationSpeed.ts   Mapeamento 1x/2x/4x para intervalos de tick
   rendering/PixiApp.ts       Canvas PixiJS
   rendering/MapRenderer.ts   Camadas, profundidade, overlays de água/comida, refresh e enquadramento
   rendering/GridMath.ts      Conversão isométrica nos dois sentidos
   simulation/CityState.ts    Estado, seed, buildings[], resources, custos e validação de construção
   simulation/Simulation.ts   Tick, água, comida ativa, emprego, acesso a estrada, evolução e estatísticas
+  scenario/Scenario.ts      Definição imutável Founding Settlement, avaliação pura e contexto curto para advisor
   simulation/Tile.ts         Coordenadas, terreno e referência buildingId opcional
-  ui/BuildPanel.ts           Painel HTML: ferramentas, custos, dinheiro, stats, top 3 issues, overlays, feedback e reset
+  ui/BuildPanel.ts           Painel HTML: ferramentas, custos, dinheiro, stats, top 3 issues, overlays, feedback, reset e bloqueio terminal
   ui/SimulationControls.ts   Painel HTML de pause/play e velocidade 1x/2x/4x
-  ui/ObjectivesPanel.ts      Painel estático com objetivos do fluxo MVP
-  ui/AdvisorPanel.ts         Painel HTML do advisor: Analyze city, plano, Approve executa via callback, mostra after-action report e Reject limpa
+  ui/ScenarioPanel.ts        Painel HTML do cenário: briefing, objetivos, progresso, ticks e resultado
+  ui/ObjectivesPanel.ts      Painel estático legado com objetivos do fluxo MVP
+  ui/AdvisorPanel.ts         Painel HTML do advisor: contexto do cenário, Analyze city, plano, Approve bloqueável, after-action report e Reject
   main.ts                   Arranque e mensagem de erro de carregamento
   style.css                 Layout da página
 public/assets/prototype/    Apenas sete PNGs e aviso de licenciamento

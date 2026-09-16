@@ -23,8 +23,14 @@ const BUILD_TITLES: Readonly<Record<BuildingType, string>> = {
 
 const BUILD_TOOLS: readonly BuildingType[] = ['road', 'house', 'well', 'farm', 'granary', 'market'];
 
+export interface BuildPanelUpdateOptions {
+  readonly buildBlocked?: boolean;
+}
+
+
 export class BuildPanel {
   selectedTool: BuildingType = 'road';
+  private readonly toolButtons: HTMLButtonElement[] = [];
   private readonly element = document.createElement('section');
   private readonly money = document.createElement('strong');
   private readonly selection = document.createElement('strong');
@@ -89,6 +95,7 @@ export class BuildPanel {
         button.setAttribute('aria-pressed', 'true');
         this.status.textContent = 'Clique num tile vazio para construir.';
       });
+      this.toolButtons.push(button);
       tools.append(button);
     }
 
@@ -166,7 +173,7 @@ export class BuildPanel {
     host.append(this.element);
   }
 
-  update(city: CityState, message: string, waterOverlay: boolean, foodOverlay: boolean): void {
+  update(city: CityState, message: string, waterOverlay: boolean, foodOverlay: boolean, options: BuildPanelUpdateOptions = {}): void {
     const housingStats = getHousingStats(city);
     const foodStats = getFoodStats(city);
     const workforceStats = getWorkforceStats(city);
@@ -192,6 +199,8 @@ export class BuildPanel {
     this.workerShortage.textContent = String(workforceStats.workerShortage);
     this.activeWorkplaces.textContent = String(workforceStats.activeWorkplaces);
     this.inactiveWorkplaces.textContent = String(workforceStats.inactiveWorkplaces);
+    const buildBlocked = options.buildBlocked === true;
+    for (const button of this.toolButtons) button.disabled = buildBlocked;
     this.setWaterOverlay(waterOverlay);
     this.setFoodOverlay(foodOverlay);
     const issues = analyzeCity(city).slice(0, 3);

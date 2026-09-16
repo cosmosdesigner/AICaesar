@@ -4,11 +4,16 @@ import { loadMapTextures } from '../assets/AssetManifest';
 import { screenToGrid } from '../rendering/GridMath';
 import { MapRenderer } from '../rendering/MapRenderer';
 import { createPixiApp } from '../rendering/PixiApp';
+import {
+  FOUNDING_SETTLEMENT_SCENARIO,
+  evaluateScenario,
+  getScenarioContext,
+} from '../scenario/Scenario';
 import { createCityState, placeBuilding, type BuildResult } from '../simulation/CityState';
 import { assignWorkers, simulateTick } from '../simulation/Simulation';
 import { BuildPanel, BUILD_LABELS } from '../ui/BuildPanel';
 import { AdvisorPanel } from '../ui/AdvisorPanel';
-import { ObjectivesPanel } from '../ui/ObjectivesPanel';
+import { ScenarioPanel } from '../ui/ScenarioPanel';
 import { SimulationControls } from '../ui/SimulationControls';
 import { getSimulationIntervalMs, type SimulationSpeed } from './SimulationSpeed';
 
@@ -47,6 +52,10 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   const simulationControls = new SimulationControls(
     panelHost,
     () => {
+      if (isScenarioTerminal()) {
+        paused = true;
+        return paused;
+      }
       paused = !paused;
       scheduleTick();
       return paused;
@@ -57,15 +66,19 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     },
   );
   simulationControls.update(paused, speed);
-  const objectives = new ObjectivesPanel(panelHost);
+  const scenarioPanel = new ScenarioPanel(panelHost, FOUNDING_SETTLEMENT_SCENARIO);
   const advisor = new AdvisorPanel(panelHost, () => city, {
+    getScenarioContext: () => getScenarioContext(evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO)),
+    isApprovalBlocked: isScenarioTerminal,
     onApprovePlan: (plan) => {
+      if (isScenarioTerminal()) {
+        return { ok: false, message: 'Advisor plan approval is blocked because the scenario has ended.' };
+      }
       const result = approveAdvisorPlan(city, plan);
       if (result.ok) refreshCity(result.message);
       return result;
     },
   });
-  panel.update(city, 'Clique num tile vazio para construir.', waterOverlay, foodOverlay);
 
   const messages: Record<Exclude<BuildResult, 'built'>, string> = {
     'outside-map': 'Construa dentro do mapa.',
@@ -78,6 +91,11 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   app.stage.cursor = 'crosshair';
   app.stage.on('pointerdown', (event: FederatedPointerEvent) => {
     if (event.button !== 0) return;
+    if (isScenarioTerminal()) {
+      refreshCity('Construção bloqueada: o cenário terminou. Use Reset para recomeçar.');
+      return;
+    }
+
     map.toLocal(event.global, undefined, local);
     const tile = screenToGrid(local.x, local.y);
     const result = tile ? placeBuilding(city, tile.x, tile.y, panel.selectedTool) : 'outside-map';
@@ -87,7 +105,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       return;
     }
 
-    panel.update(city, messages[result], waterOverlay, foodOverlay);
+    panel.update(city, messages[result], waterOverlay, foodOverlay, { buildBlocked: isScenarioTerminal() });
   });
 
   const resize = (): void => {
@@ -99,7 +117,21 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   function refreshCity(message: string): void {
     map.refresh(city, { waterOverlay, foodOverlay });
     resize();
-    panel.update(city, message, waterOverlay, foodOverlay);
+    const scenarioProgress = evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO);
+    if (scenarioProgress.status !== 'active') {
+      paused = true;
+      scheduleTick();
+      simulationControls.update(paused, speed);
+    }
+    scenarioPanel.update(scenarioProgress);
+    advisor.updateScenarioContext();
+    panel.update(
+      city,
+      scenarioProgress.resultMessage ?? message,
+      waterOverlay,
+      foodOverlay,
+      { buildBlocked: scenarioProgress.status !== 'active' },
+    );
     app.render();
   }
 
@@ -112,11 +144,15 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
 
     tickHandle = window.setInterval(() => {
       simulateTick(city);
-      map.refresh(city, { waterOverlay, foodOverlay });
-      panel.update(city, 'Simulação atualizada.', waterOverlay, foodOverlay);
-      app.render();
+      refreshCity('Simulação atualizada.');
     }, getSimulationIntervalMs(speed));
   }
+
+  function isScenarioTerminal(): boolean {
+    return evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO).status !== 'active';
+  }
+
+  refreshCity('Clique num tile vazio para construir.');
 
   const observer = new ResizeObserver(resize);
   observer.observe(host);
@@ -128,7 +164,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     observer.disconnect();
     panel.destroy();
     simulationControls.destroy();
-    objectives.destroy();
+    scenarioPanel.destroy();
     advisor.destroy();
     app.destroy(true, { children: true });
   };
