@@ -1,5 +1,5 @@
 import { type FederatedPointerEvent, Point } from 'pixi.js';
-import { executePlan } from '../actions/ActionExecutor';
+import { approveAdvisorPlan } from '../advisor/AdvisorApproval';
 import { loadMapTextures } from '../assets/AssetManifest';
 import { screenToGrid } from '../rendering/GridMath';
 import { MapRenderer } from '../rendering/MapRenderer';
@@ -40,9 +40,9 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   );
   const advisor = new AdvisorPanel(panelHost, () => city, {
     onApprovePlan: (plan) => {
-      const result = executePlan(city, plan, plan.estimatedCost);
+      const result = approveAdvisorPlan(city, plan);
       if (result.ok) refreshCity(result.message);
-      return { ok: result.ok, message: result.message };
+      return result;
     },
   });
   panel.update(city, 'Clique num tile vazio para construir.', waterOverlay, foodOverlay);

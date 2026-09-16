@@ -53,6 +53,13 @@ main { padding: 0 16px; }
 .advisor-panel > p {
   flex-basis: 100%;
 }
+.after-action-report {
+  flex-basis: 100%;
+  padding-top: 4px;
+}
+.after-action-report p {
+  margin-top: 6px;
+}
 .advisor-controls {
   display: flex;
   gap: 8px;

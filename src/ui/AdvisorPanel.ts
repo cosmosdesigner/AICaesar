@@ -1,13 +1,11 @@
 import type { AdvisorProvider } from '../advisor/AdvisorProvider';
+import type { AdvisorApprovalResult } from '../advisor/AdvisorApproval';
+import type { AfterActionReport } from '../advisor/AfterActionReport';
 import type { AdvisorPlan } from '../advisor/MockAdvisor';
 import { createMockAdvisorProvider } from '../advisor/providers/MockAdvisorProvider';
 import { analyzeCity, summarizeCity } from '../analysis/CityAnalyzer';
 import type { CityState } from '../simulation/CityState';
 
-export interface AdvisorApprovalResult {
-  readonly ok: boolean;
-  readonly message: string;
-}
 
 export interface AdvisorPanelOptions {
   readonly provider?: AdvisorProvider;
@@ -16,6 +14,7 @@ export interface AdvisorPanelOptions {
 
 export class AdvisorPanel {
   private plan: AdvisorPlan | undefined;
+  private report: AfterActionReport | undefined;
   private providerUsed: string | undefined;
   private analysisRequest = 0;
   private readonly advisorProvider: AdvisorProvider;
@@ -29,6 +28,11 @@ export class AdvisorPanel {
   private readonly risks = document.createElement('ul');
   private readonly controls = document.createElement('div');
   private readonly status = document.createElement('p');
+  private readonly reportSection = document.createElement('div');
+  private readonly reportSummary = document.createElement('p');
+  private readonly reportDeltas = document.createElement('ul');
+  private readonly reportIssuesLabel = document.createElement('p');
+  private readonly reportIssues = document.createElement('ul');
 
   constructor(
     host: HTMLElement,
@@ -65,11 +69,13 @@ export class AdvisorPanel {
         return;
       }
 
+      this.report = result.ok ? result.report : undefined;
       this.status.textContent = result.message;
       if (result.ok) {
         this.plan = undefined;
-        this.renderPlan();
+        this.providerUsed = undefined;
       }
+      this.renderPlan();
     });
 
     const reject = document.createElement('button');
@@ -77,6 +83,7 @@ export class AdvisorPanel {
     reject.textContent = 'Reject';
     reject.addEventListener('click', () => {
       this.plan = undefined;
+      this.report = undefined;
       this.renderPlan();
       this.providerUsed = undefined;
       this.status.textContent = 'Plan rejected.';
@@ -88,6 +95,12 @@ export class AdvisorPanel {
     this.status.className = 'advisor-status';
     this.status.setAttribute('role', 'status');
     this.status.textContent = 'No advisor plan generated yet.';
+
+    const reportTitle = document.createElement('h3');
+    reportTitle.textContent = 'After-action report';
+    this.reportSection.className = 'after-action-report';
+    this.reportIssuesLabel.className = 'after-action-issues-label';
+    this.reportSection.append(reportTitle, this.reportSummary, this.reportDeltas, this.reportIssuesLabel, this.reportIssues);
 
     this.element.append(
       title,
@@ -101,6 +114,7 @@ export class AdvisorPanel {
       this.createSection('Risks', this.risks),
       this.controls,
       this.status,
+      this.reportSection,
     );
     this.renderPlan();
     host.append(this.element);
@@ -116,6 +130,7 @@ export class AdvisorPanel {
     this.analysisRequest = request;
     this.plan = undefined;
     this.providerUsed = undefined;
+    this.report = undefined;
     this.renderPlan();
     this.status.textContent = 'Analyzing...';
 
@@ -147,8 +162,8 @@ export class AdvisorPanel {
     this.actions.replaceChildren();
     this.expectedImpact.replaceChildren();
     this.risks.replaceChildren();
+    this.renderReport();
     this.controls.hidden = this.plan === undefined;
-
     if (!this.plan) {
       this.summary.textContent = 'Click Analyze city to generate an advisor provider plan.';
       this.provider.textContent = '';
@@ -168,6 +183,31 @@ export class AdvisorPanel {
     this.renderItems(this.risks, this.plan.risks);
   }
 
+  private renderReport(): void {
+    this.reportDeltas.replaceChildren();
+    this.reportIssues.replaceChildren();
+    this.reportSection.hidden = this.report === undefined;
+
+    if (this.report === undefined) return;
+
+    this.reportSummary.textContent = `Summary: ${this.report.summary}`;
+    if (this.report.deltas.length === 0) {
+      this.renderItems(this.reportDeltas, ['No tracked metric changes.']);
+    } else {
+      this.renderItems(this.reportDeltas, this.report.deltas.map((delta) => (
+        `${delta.label}: ${delta.before} → ${delta.after} (${formatSigned(delta.delta)})`
+      )));
+    }
+
+    if (this.report.remainingIssues.length === 0) {
+      this.reportIssuesLabel.textContent = 'No remaining critical issues detected.';
+      return;
+    }
+
+    this.reportIssuesLabel.textContent = 'Remaining issues:';
+    this.renderItems(this.reportIssues, this.report.remainingIssues);
+  }
+
   private createSection(title: string, list: HTMLUListElement | HTMLOListElement): HTMLElement {
     const section = document.createElement('div');
     const heading = document.createElement('h3');
@@ -183,4 +223,8 @@ export class AdvisorPanel {
       list.append(item);
     }
   }
+}
+
+function formatSigned(value: number): string {
+  return value > 0 ? `+${value}` : String(value);
 }
