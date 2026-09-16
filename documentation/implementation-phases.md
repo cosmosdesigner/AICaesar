@@ -532,16 +532,20 @@ Princípio para o pós-MVP:
 
 ### Objetivo
 
-Criar uma experiência com começo, objetivo e condição de sucesso/falha.
+Criar uma experiência com começo, objetivo e condição de sucesso/falha, inspirada nos ficheiros `.mission` da Caesaria.
+
+Esta fase transforma o protótipo de sandbox numa missão jogável.
 
 ### Entregáveis
 
-- sistema de cenário;
+- `ScenarioDefinition`;
+- briefing curto;
 - objetivos visíveis;
 - condição de vitória;
 - condição de derrota simples;
 - painel de progresso;
-- primeiro cenário jogável de 10–15 minutos.
+- primeiro cenário jogável de 10–15 minutos;
+- advisor consciente dos objetivos do cenário.
 
 ### Exemplo de cenário inicial
 
@@ -555,6 +559,23 @@ Objetivos:
 - manter worker shortage abaixo de 20%;
 - terminar com dinheiro acima de 100.
 
+### Inspiração Caesaria
+
+Usar como referência:
+
+```text
+/root/caesaria-game-inspect/bin/resources/missions/*.mission
+/root/caesaria-game-inspect/bin/resources/missions/caesarea.mission
+```
+
+Adaptar apenas os conceitos:
+
+- briefing;
+- objetivos;
+- win conditions;
+- eventos por data mais tarde;
+- progressão de cenário.
+
 ### Critérios de aceitação
 
 - jogador entende o objetivo sem ler documentação;
@@ -563,7 +584,51 @@ Objetivos:
 - derrota por falência/colapso é detetada automaticamente;
 - advisor consegue comentar o objetivo principal.
 
-## 21. Fase 14 — Economia mínima e rendimento
+## 21. Fase 14 — Navegação de mapa e câmara
+
+### Objetivo
+
+Fazer o mapa ser confortável de jogar quando a cidade crescer.
+
+Antes de aprofundar economia e simulação, o jogador precisa conseguir navegar bem: mover, aproximar, afastar e orientar-se.
+
+### Entregáveis
+
+- pan do mapa com drag do rato;
+- zoom in/out com roda do rato e botões;
+- reset camera / center city;
+- limites de zoom;
+- limites ou elasticidade de pan;
+- mini ajuda de controlos;
+- persistência temporária da câmara durante a sessão;
+- testes para helpers matemáticos de zoom/pan quando aplicável.
+
+### Rotação
+
+Rotação deve ser tratada com cuidado.
+
+Recomendação:
+
+- não implementar rotação livre já;
+- implementar primeiro apenas pan + zoom;
+- investigar depois rotação em passos de 90° como fase separada se o renderer, sprites e seleção de tiles suportarem bem.
+
+Motivo:
+
+- o mapa atual é isométrico 2D com sprites pré-renderizados;
+- rotação real exigiria sprites para múltiplas orientações ou transformação visual que pode ficar errada;
+- pan/zoom trazem benefício imediato com baixo risco;
+- rotação pode quebrar input, depth sorting e leitura visual.
+
+### Critérios de aceitação
+
+- jogador consegue mover-se pelo mapa sem perder contexto;
+- zoom mantém o tile sob o cursor estável sempre que possível;
+- existe botão para recentrar;
+- construção continua correta após pan/zoom;
+- overlays continuam alinhados.
+
+## 22. Fase 15 — Economia mínima e rendimento
 
 ### Objetivo
 
@@ -579,10 +644,19 @@ Fazer dinheiro importar para além de ser apenas um contador que desce.
 
 ### Regras simples
 
-- casas geram impostos por nível;
+- casas geram impostos por nível/população;
 - farms/granaries/markets/wells têm upkeep;
 - roads podem ter upkeep muito baixo ou zero;
 - se dinheiro ficar abaixo de 0 durante N ticks, derrota.
+
+### Inspiração Caesaria
+
+Usar `house.cpp`, `house_spec.*` e mission files apenas como referência conceptual:
+
+- tax rate;
+- prosperity;
+- efeitos de nível da casa;
+- pressão por objetivos económicos.
 
 ### Critérios de aceitação
 
@@ -590,7 +664,93 @@ Fazer dinheiro importar para além de ser apenas um contador que desce.
 - cidade mal planeada perde dinheiro;
 - jogador precisa equilibrar expansão e manutenção.
 
-## 22. Fase 15 — Crescimento populacional e migração
+## 23. Fase 16 — House specification e evolução habitacional
+
+### Objetivo
+
+Substituir a evolução simples hardcoded por um modelo explícito de requisitos por nível.
+
+Esta fase deve vir antes de população/migração profunda porque define a base de casas, capacidade, impostos e missing requirements.
+
+### Entregáveis
+
+- `HouseSpecification` em TypeScript;
+- requisitos por nível;
+- capacidade por nível;
+- tax value por nível;
+- missing requirement por casa;
+- evolução/degradação baseada em requisitos;
+- UI/analyzer explicam por que uma casa não evolui.
+
+### Regras iniciais sugeridas
+
+- nível 1: estrada;
+- nível 2: estrada + água;
+- nível 3: estrada + água + comida;
+- nível 4: estrada + água + comida + desirability mínima, quando desirability existir.
+
+### Inspiração Caesaria
+
+Usar como referência:
+
+```text
+/root/caesaria-game-inspect/source/objects/house_spec.hpp
+/root/caesaria-game-inspect/source/objects/house_spec.cpp
+/root/caesaria-game-inspect/source/objects/house_level.hpp
+/root/caesaria-game-inspect/source/objects/house.cpp
+```
+
+Adaptar conceitos, não portar implementação.
+
+### Critérios de aceitação
+
+- requisitos de evolução ficam declarativos;
+- analyzer consegue mostrar missing requirement;
+- casas evoluem/degradam de forma compreensível;
+- população/capacidade derivam da spec.
+
+## 24. Fase 17 — Market/granary storage e procura
+
+### Objetivo
+
+Tornar a cadeia de comida mais Caesar-like sem implementar walkers completos.
+
+### Entregáveis
+
+- granaries têm stock real;
+- markets têm stock próprio;
+- markets calculam goods demand;
+- farms produzem para granary;
+- markets abastecem-se de granary por regra simplificada;
+- casas consomem do market;
+- analyzer distingue falha de produção, armazenamento e distribuição.
+
+### Inspiração Caesaria
+
+Usar como referência:
+
+```text
+/root/caesaria-game-inspect/source/objects/market.cpp
+/root/caesaria-game-inspect/source/objects/market.hpp
+/root/caesaria-game-inspect/source/walker/market_buyer.cpp
+/root/caesaria-game-inspect/source/good/good.cpp
+/root/caesaria-game-inspect/source/good/good.hpp
+```
+
+Conceitos relevantes:
+
+- market storage;
+- demand por diferença entre capacity e qty;
+- market buyer procura bens;
+- diferentes goods no futuro.
+
+### Critérios de aceitação
+
+- comida já não é apenas stock global;
+- markets podem falhar por falta de abastecimento;
+- advisor identifica onde a cadeia falha.
+
+## 25. Fase 18 — Crescimento populacional e migração
 
 ### Objetivo
 
@@ -617,7 +777,7 @@ Substituir população estática por crescimento condicionado pelos serviços.
 - serviços atraem habitantes;
 - colapso de comida afeta população, impostos e trabalhadores.
 
-## 23. Fase 16 — Road network e walkers simplificados
+## 26. Fase 19 — Road network e service reach
 
 ### Objetivo
 
@@ -628,7 +788,8 @@ Dar mais peso ao layout da cidade.
 - cálculo de conectividade por estrada;
 - edifícios precisam estar ligados à rede principal;
 - markets/wells/farms distribuem por distância na estrada em vez de raio direto;
-- walkers visuais simples opcionais.
+- overlay de rede/cobertura;
+- walkers visuais simples opcionais depois da regra estar correta.
 
 ### Simplificação
 
@@ -646,7 +807,7 @@ Primeiro passo:
 - edifícios isolados deixam de funcionar;
 - jogador precisa desenhar bairros coerentes.
 
-## 24. Fase 17 — Desirability e evolução habitacional
+## 27. Fase 20 — Desirability e qualidade urbana
 
 ### Objetivo
 
@@ -673,36 +834,7 @@ Adicionar qualidade urbana como decisão de layout.
 - bairros bem planeados evoluem melhor;
 - analyzer deteta baixa desirability.
 
-## 25. Fase 18 — Cadeias económicas reais
-
-### Objetivo
-
-Transformar comida e produção num sistema mais interessante.
-
-### Entregáveis
-
-- múltiplos alimentos ou bens simples;
-- farms com output diferente;
-- warehouses/granaries com stock por tipo;
-- markets precisam abastecer-se;
-- consumo por população;
-- bottlenecks visíveis.
-
-### Ordem recomendada
-
-1. food types simples: vegetables/meat/fruit;
-2. storage por tipo;
-3. market supply;
-4. consumo por casas;
-5. advisor identifica bottlenecks.
-
-### Critérios de aceitação
-
-- cadeia produtiva pode falhar em produção, armazenamento ou distribuição;
-- advisor consegue distinguir a causa;
-- jogador tem escolhas reais de infraestrutura.
-
-## 26. Fase 19 — Eventos e pressão de jogo
+## 28. Fase 21 — Eventos e pressão de jogo
 
 ### Objetivo
 
@@ -714,8 +846,20 @@ Criar tensão e variação entre sessões.
 - seca reduz produção de farms;
 - epidemia reduz população temporariamente;
 - incêndio/risco urbano simples;
+- pedidos do imperador;
 - mensagens de evento;
 - advisor reage a eventos.
+
+### Inspiração Caesaria
+
+Usar mission files para estrutura de eventos:
+
+- data;
+- trigger;
+- mensagem;
+- impacto;
+- pedido de goods;
+- alteração de preço.
 
 ### Critérios de aceitação
 
@@ -723,7 +867,7 @@ Criar tensão e variação entre sessões.
 - eventos são compreensíveis e não parecem injustos;
 - há warning antes de eventos severos quando possível.
 
-## 27. Fase 20 — Save/load local
+## 29. Fase 22 — Save/load local
 
 ### Objetivo
 
@@ -744,7 +888,7 @@ Permitir continuidade de jogo.
 - saves antigos falham de forma segura se schema mudar;
 - não há backend.
 
-## 28. Fase 21 — UX de jogo sério
+## 30. Fase 23 — UX de jogo sério
 
 ### Objetivo
 
@@ -758,7 +902,8 @@ Reduzir fricção e tornar decisões legíveis.
 - erro visual no tile inválido;
 - painel de logs/eventos;
 - objetivos sempre visíveis;
-- atalhos de teclado básicos.
+- atalhos de teclado básicos;
+- melhor organização dos painéis.
 
 ### Critérios de aceitação
 
@@ -766,7 +911,7 @@ Reduzir fricção e tornar decisões legíveis.
 - é possível jogar sem abrir o README;
 - ações comuns são rápidas.
 
-## 29. Fase 22 — Advisor estratégico
+## 31. Fase 24 — Advisor estratégico
 
 ### Objetivo
 
@@ -787,7 +932,7 @@ Fazer o advisor ser útil como parceiro de jogo, não só corretor de problemas.
 - jogador pode aceitar/rejeitar com confiança;
 - executor continua a validar tudo.
 
-## 30. Fase 23 — Conteúdo e balanceamento
+## 32. Fase 25 — Conteúdo e balanceamento
 
 ### Objetivo
 
@@ -810,7 +955,7 @@ Transformar sistemas em jogo equilibrado.
 - cenário 3 testa resiliência;
 - uma sessão de 30 minutos tem progressão clara.
 
-## 31. Fonte de inspiração Caesaria
+## 33. Fonte de inspiração Caesaria
 
 O clone local da Caesaria permanece disponível em:
 
@@ -942,7 +1087,7 @@ Regra prática:
 - manter sistemas pequenos e testáveis;
 - só aumentar fidelidade quando o loop de jogo pedir.
 
-## 32. Próximo passo recomendado
+## 34. Próximo passo recomendado
 
 A próxima fase a implementar deve ser a Fase 13: loop de jogo e objetivos de cenário.
 
