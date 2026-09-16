@@ -6,6 +6,7 @@ import { createPixiApp } from '../rendering/PixiApp';
 import { createCityState, placeBuilding, type BuildResult } from '../simulation/CityState';
 import { assignWorkers, simulateTick } from '../simulation/Simulation';
 import { BuildPanel, BUILD_LABELS } from '../ui/BuildPanel';
+import { AdvisorPanel } from '../ui/AdvisorPanel';
 
 export async function startGame(host: HTMLElement, panelHost: HTMLElement): Promise<() => void> {
   let city = createCityState();
@@ -38,6 +39,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       return foodOverlay;
     },
   );
+  const advisor = new AdvisorPanel(panelHost, () => city);
   panel.update(city, 'Clique num tile vazio para construir.', waterOverlay, foodOverlay);
 
   const messages: Record<Exclude<BuildResult, 'built'>, string> = {
@@ -84,6 +86,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     window.clearInterval(tickHandle);
     observer.disconnect();
     panel.destroy();
+    advisor.destroy();
     app.destroy(true, { children: true });
   };
 }

@@ -15,7 +15,8 @@ p { margin: 0; }
 header > p, footer { color: #a8b5ab; font-size: 13px; }
 header span { color: #667b6d; padding: 0 10px; }
 main { padding: 0 16px; }
-.build-panel {
+.build-panel,
+.advisor-panel {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -26,6 +27,39 @@ main { padding: 0 16px; }
   border: 1px solid #35463b;
   border-radius: 6px;
   font-size: 14px;
+}
+.advisor-panel {
+  align-items: flex-start;
+}
+.advisor-panel h2,
+.advisor-panel h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.advisor-panel h3 {
+  color: #b9ba8e;
+  font-size: 13px;
+}
+.advisor-panel > div {
+  flex: 1 1 180px;
+}
+.advisor-panel ul,
+.advisor-panel ol {
+  margin: 6px 0 0 20px;
+  padding: 0;
+}
+.advisor-summary,
+.advisor-status,
+.advisor-panel > p {
+  flex-basis: 100%;
+}
+.advisor-controls {
+  display: flex;
+  gap: 8px;
+}
+.advisor-status {
+  min-height: 1.5em;
+  color: #d6c18b;
 }
 .build-tools { display: flex; flex-wrap: wrap; gap: 8px; }
 .build-stats {
