@@ -1,6 +1,6 @@
 import { analyzeCity } from '../analysis/CityAnalyzer';
 import { BUILD_COSTS, type CityState } from '../simulation/CityState';
-import { getFoodStats, getHousingStats, getWorkforceStats } from '../simulation/Simulation';
+import { getFinanceStats, getFoodStats, getHousingStats, getWorkforceStats } from '../simulation/Simulation';
 import type { BuildingType } from '../simulation/Tile';
 
 export const BUILD_LABELS: Readonly<Record<BuildingType, string>> = {
@@ -35,6 +35,12 @@ export class BuildPanel {
   private readonly money = document.createElement('strong');
   private readonly selection = document.createElement('strong');
   private readonly tick = document.createElement('strong');
+  private readonly financePeriod = document.createElement('strong');
+  private readonly financeTaxes = document.createElement('strong');
+  private readonly financeUpkeep = document.createElement('strong');
+  private readonly financeNet = document.createElement('strong');
+  private readonly financeTreasury = document.createElement('strong');
+  private readonly financeNext = document.createElement('strong');
   private readonly housesTotal = document.createElement('strong');
   private readonly housesRoad = document.createElement('strong');
   private readonly housesWater = document.createElement('strong');
@@ -124,6 +130,22 @@ export class BuildPanel {
       this.createStat('Workplaces inativos', this.inactiveWorkplaces),
     );
 
+    const finance = document.createElement('div');
+    finance.className = 'finance-stats';
+    finance.title = 'Taxes from houses minus upkeep for wells, farms, granaries and markets every 10 ticks.';
+    const financeTitle = document.createElement('h2');
+    financeTitle.textContent = 'Finance';
+    finance.append(
+      financeTitle,
+      this.createStat('Period', this.financePeriod),
+      this.createStat('Taxes', this.financeTaxes),
+      this.createStat('Upkeep', this.financeUpkeep),
+      this.createStat('Net', this.financeNet),
+      this.createStat('Treasury', this.financeTreasury),
+      this.createStat('Next balance', this.financeNext),
+    );
+
+
     this.waterOverlay.type = 'button';
     this.waterOverlay.textContent = 'Show water coverage: Off';
     this.waterOverlay.title = 'Toggle tiles covered by wells.';
@@ -164,6 +186,7 @@ export class BuildPanel {
       tick,
       tools,
       stats,
+      finance,
       this.waterOverlay,
       this.foodOverlay,
       this.issues,
@@ -177,6 +200,7 @@ export class BuildPanel {
     const housingStats = getHousingStats(city);
     const foodStats = getFoodStats(city);
     const workforceStats = getWorkforceStats(city);
+    const financeStats = getFinanceStats(city);
     this.money.textContent = String(city.resources.money);
     this.tick.textContent = String(city.simulation.tick);
     this.housesTotal.textContent = String(housingStats.totalHouses);
@@ -199,6 +223,12 @@ export class BuildPanel {
     this.workerShortage.textContent = String(workforceStats.workerShortage);
     this.activeWorkplaces.textContent = String(workforceStats.activeWorkplaces);
     this.inactiveWorkplaces.textContent = String(workforceStats.inactiveWorkplaces);
+    this.financePeriod.textContent = String(financeStats.period);
+    this.financeTaxes.textContent = `+${financeStats.revenue}`;
+    this.financeUpkeep.textContent = financeStats.upkeep === 0 ? '0' : `-${financeStats.upkeep}`;
+    this.financeNet.textContent = formatSignedFinanceValue(financeStats.net);
+    this.financeTreasury.textContent = String(financeStats.money);
+    this.financeNext.textContent = `${financeStats.ticksUntilNextPeriod} ticks`;
     const buildBlocked = options.buildBlocked === true;
     for (const button of this.toolButtons) button.disabled = buildBlocked;
     this.setWaterOverlay(waterOverlay);
@@ -239,4 +269,9 @@ export class BuildPanel {
     this.foodOverlay.textContent = `Show food coverage: ${enabled ? 'On' : 'Off'}`;
     this.foodOverlay.setAttribute('aria-pressed', String(enabled));
   }
+}
+
+function formatSignedFinanceValue(value: number): string {
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value}`;
 }

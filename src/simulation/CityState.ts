@@ -31,8 +31,16 @@ export interface ResourceState {
   food: number;
 }
 
+export interface FinanceState {
+  period: number;
+  lastRevenue: number;
+  lastUpkeep: number;
+  lastNet: number;
+}
+
 export interface SimulationState {
   tick: number;
+  finance: FinanceState;
 }
 
 export interface CityState {
@@ -59,7 +67,7 @@ export function createCityState(): CityState {
     tiles,
     buildings: [],
     resources: { money: INITIAL_MONEY, food: 0 },
-    simulation: { tick: 0 },
+    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
   };
 
   for (let y = 0; y < MAP_HEIGHT; y++) {

@@ -17,6 +17,18 @@ export const HOUSE_POPULATION_BY_LEVEL: Readonly<Record<1 | 2 | 3, number>> = {
   2: 8,
   3: 14,
 };
+export const FINANCE_INTERVAL_TICKS = 10;
+export const HOUSE_TAX_BY_LEVEL: Readonly<Record<1 | 2 | 3, number>> = {
+  1: 2,
+  2: 4,
+  3: 7,
+};
+export const BUILDING_UPKEEP: Readonly<Partial<Record<BuildingType, number>>> = {
+  well: 1,
+  farm: 3,
+  granary: 3,
+  market: 3,
+};
 export const WORKFORCE_RATIO = 0.5;
 export const WORKERS_REQUIRED: Readonly<Record<WorkplaceType, number>> = {
   farm: 6,
@@ -59,6 +71,15 @@ export interface WorkforceStats {
   readonly activeWorkplaces: number;
   readonly inactiveWorkplaces: number;
 }
+export interface FinanceStats {
+  readonly period: number;
+  readonly revenue: number;
+  readonly upkeep: number;
+  readonly net: number;
+  readonly money: number;
+  readonly ticksUntilNextPeriod: number;
+}
+
 
 export function simulateTick(city: CityState): void {
   city.simulation.tick += 1;
@@ -91,6 +112,42 @@ export function simulateTick(city: CityState): void {
 
   if (shouldConsumeFood) city.resources.food = availableFood;
   assignWorkers(city);
+  if (city.simulation.tick % FINANCE_INTERVAL_TICKS === 0) applyFinancePeriod(city);
+}
+
+export function getHouseTax(city: CityState): number {
+  return city.buildings.reduce((total, building) => {
+    if (building.type !== 'house') return total;
+    return total + HOUSE_TAX_BY_LEVEL[getHouseLevel(building)];
+  }, 0);
+}
+
+export function getBuildingUpkeep(city: CityState): number {
+  return city.buildings.reduce((total, building) => total + (BUILDING_UPKEEP[building.type] ?? 0), 0);
+}
+
+export function getFinanceStats(city: CityState): FinanceStats {
+  const finance = city.simulation.finance;
+  return {
+    period: finance.period,
+    revenue: finance.lastRevenue,
+    upkeep: finance.lastUpkeep,
+    net: finance.lastNet,
+    money: city.resources.money,
+    ticksUntilNextPeriod: getTicksUntilNextFinancePeriod(city.simulation.tick),
+  };
+}
+
+export function applyFinancePeriod(city: CityState): FinanceStats {
+  const revenue = getHouseTax(city);
+  const upkeep = getBuildingUpkeep(city);
+  const net = revenue - upkeep;
+  city.resources.money += net;
+  city.simulation.finance.period += 1;
+  city.simulation.finance.lastRevenue = revenue;
+  city.simulation.finance.lastUpkeep = upkeep;
+  city.simulation.finance.lastNet = net;
+  return getFinanceStats(city);
 }
 
 export function hasAdjacentRoad(city: CityState, building: Building): boolean {
@@ -241,6 +298,15 @@ function produceFood(city: CityState): void {
     capacity,
     city.resources.food + countActiveBuildings(city, 'farm') * FARM_FOOD_PER_TICK,
   );
+}
+
+function getHouseLevel(building: Building): 1 | 2 | 3 {
+  return Math.min(Math.max(building.level ?? 1, 1), 3) as 1 | 2 | 3;
+}
+
+function getTicksUntilNextFinancePeriod(tick: number): number {
+  const elapsedInPeriod = tick % FINANCE_INTERVAL_TICKS;
+  return elapsedInPeriod === 0 ? FINANCE_INTERVAL_TICKS : FINANCE_INTERVAL_TICKS - elapsedInPeriod;
 }
 
 function updateHouseLevel(building: Building): void {

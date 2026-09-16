@@ -42,7 +42,8 @@ main { padding: 0 16px; }
 .simulation-controls h2,
 .camera-controls h2,
 .objectives-panel h2,
-.scenario-panel h2 {
+.scenario-panel h2,
+.finance-stats h2 {
   margin: 0;
   font-size: 16px;
 }
@@ -99,11 +100,15 @@ main { padding: 0 16px; }
   color: #d6c18b;
 }
 .build-tools { display: flex; flex-wrap: wrap; gap: 8px; }
-.build-stats {
+.build-stats,
+.finance-stats {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
   color: #a8b5ab;
+}
+.finance-stats {
+  flex-basis: 100%;
 }
 .city-issues {
   flex-basis: 100%;

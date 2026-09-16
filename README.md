@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 14 — map navigation and camera**: mapa isométrico 30×30, construção manual, seed determinístico com estrada/casas/poço/farm/granary/market, simulação pausável com velocidades 1x/2x/4x, overlays de água/comida, cenário **Found a functioning settlement**, advisor mock local por defeito, execução transacional validada de planos aprovados, relatório determinístico e navegação de câmara com pan, zoom com limites e botão para recentrar/enquadrar o mapa.
+**Fase 15 — economia mínima**: mapa isométrico 30×30, construção manual, seed determinístico com estrada/casas/poço/farm/granary/market, simulação pausável com velocidades 1x/2x/4x, overlays de água/comida, cenário **Found a functioning settlement**, advisor mock local por defeito, execução transacional validada de planos aprovados, relatório determinístico, navegação de câmara e balanço financeiro determinístico a cada 10 ticks.
 
 ## Executar localmente
 
@@ -19,7 +19,7 @@ npm test
 npm run preview
 ```
 
-`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa os testes unitários Vitest do seed inicial, cenário, mapeamento de velocidade, câmera, analyzer, advisor mock, providers/fallback/schema, executor de ações e after-action reports; `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui os assets temporários e não deve ser publicado.** Browser testing não foi executado nesta implementação da Fase 14.
+`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa os testes unitários Vitest do seed inicial, cenário, mapeamento de velocidade, câmera, analyzer, advisor mock, providers/fallback/schema, executor de ações, after-action reports e economia financeira mínima; `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui os assets temporários e não deve ser publicado.** Browser testing não foi executado nesta implementação da Fase 15.
 
 ## O que aparece
 
@@ -31,9 +31,11 @@ npm run preview
 - A atribuição é determinística por tick: granaries primeiro, depois farms e markets; workplaces sem trabalhadores suficientes ficam inativos.
 - Só farms ativas produzem 2 unidades de comida por tick; só granaries ativas adicionam 100 de capacidade; só markets ativos cobrem casas em raio Manhattan 4.
 - Casas cobertas por market ativo consomem 1 comida a cada 2 ticks enquanto houver stock e evoluem para nível 3 após 5 ticks de serviço alimentar.
+- A cada **10 ticks**, o balanço financeiro aplica impostos de casas menos upkeep de serviços/economia: casas nível 1/2/3 rendem **2/4/7** por período; well/farm/granary/market custam **1/3/3/3** por período; roads e houses não têm upkeep.
+- Workplaces inativos continuam a pagar upkeep. O dinheiro pode ficar negativo por balanço financeiro, mas novas construções continuam bloqueadas quando o saldo não cobre o custo.
 - Overlays opcionais de água e comida, desenhados sem novos sprites, mostram cobertura de poços e markets ativos; no overlay de comida, casas sem comida recebem tint laranja.
-- O painel **Simulation** mostra **Running/Paused**, botão **Pause/Play** e velocidades **1x**, **2x** e **4x**; overlays e construção continuam disponíveis quando pausado.
-- O painel **Found a functioning settlement** mostra briefing, estado **Active/Victory/Defeat**, tick atual/limite 900 e progresso atual/target dos objetivos: população 80, água 70%, comida 50%, falta de trabalhadores até 20% e dinheiro 100.
+- O painel **Simulation** mostra **Running/Paused**, botão **Pause/Play** e velocidades **1x**, **2x** e **4x**; overlays, construção e painel financeiro continuam disponíveis quando pausado.
+- O painel **Finance** mostra período, impostos, upkeep, net, treasury e ticks até ao próximo balanço.
 - Botões principais têm `title` simples para explicar construção, overlays, análise, aprovação, rejeição, reset, pausa/play e velocidade.
 - O analyzer determinístico resume tick, dinheiro, casas, água, comida e emprego, e gera issues ordenadas por severidade, tipo estável e número de tiles afetados.
 - O painel mostra os 3 principais problemas detetados, incluindo falta de água/comida, falta de produção/distribuição de comida, falta de trabalhadores, edifícios económicos sem estrada e dinheiro baixo; sem issues, mostra que não há problemas críticos.
@@ -50,8 +52,8 @@ npm run preview
 3. Usar **Pause** para parar os ticks, alternar **Show water coverage** e **Show food coverage**, e confirmar que os overlays explicam água de wells e comida de markets ativos.
 4. Voltar a **Play** em **1x**, depois experimentar **2x** ou **4x** para acelerar produção, consumo, upgrades e avanço do limite de 900 ticks.
 5. Construir casas/serviços em tiles vazios e usar **Analyze city**/**Approve** para executar um plano validado. O advisor mostra a meta restante principal do cenário.
-6. Se todos os objetivos passarem, o estado vira **Victory**; se dinheiro cair abaixo de 50 ou chegar ao tick 900 sem vitória, vira **Defeat**. Em ambos os casos, ticks, construção e aprovação ficam bloqueados.
-7. Clicar **Reset** para restaurar dinheiro, comida, tick 0, cidade seedada e cenário **Active**; pausa/velocidade ficam como estão para facilitar nova demonstração.
+6. Se todos os objetivos passarem, o estado vira **Victory**; se dinheiro cair abaixo de 50, inclusive por upkeep periódico, ou chegar ao tick 900 sem vitória, vira **Defeat**. Em ambos os casos, ticks, construção e aprovação ficam bloqueados.
+7. Clicar **Reset** para restaurar dinheiro, comida, tick 0, estado financeiro vazio, cidade seedada e cenário **Active**; pausa/velocidade ficam como estão para facilitar nova demonstração.
 
 ## Construção manual
 
@@ -59,13 +61,13 @@ npm run preview
 - Selecionar **Road (4)**, **House (20)**, **Well (35)**, **Farm (45)**, **Granary (60)** ou **Market (50)** no painel; Road começa selecionada.
 - Clicar com o botão principal num tile vazio para construir. O dinheiro diminui pelo custo indicado.
 - Cada construção cria um `Building { id, type, x, y }`; casas também guardam `level`, `hasRoadAccess`, `hasWater`, `hasFood` e `upgradeProgress`; workplaces (`farm`, `granary`, `market`) guardam `active` para feedback visual simples; granaries recebem `storedFood` temporário, com o stock efetivo centralizado em `resources.food`.
-- O painel mostra dinheiro, ferramenta selecionada, tick, estatísticas de casas/água/comida, estatísticas de emprego, toggles de overlay com labels claros, feedback da última ação e estado do cenário.
-- Tiles ocupados, coordenadas fora do mapa, dinheiro insuficiente e cenário terminado são rejeitados sem alterar cidade, saldo ou comida.
-- **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `resources.food`, `simulation.tick`, edifícios iniciais, estado ativo/inativo recalculado e cenário **Active**; mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
+- O painel mostra dinheiro, ferramenta selecionada, tick, estatísticas de casas/água/comida, estatísticas de emprego, painel financeiro, toggles de overlay com labels claros, feedback da última ação e estado do cenário.
+- Tiles ocupados, coordenadas fora do mapa, dinheiro insuficiente e cenário terminado são rejeitados sem alterar cidade, saldo ou comida. O balanço financeiro pode tornar o saldo negativo; `placeBuilding` continua a validar o saldo disponível antes de construir.
+- **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `resources.food`, `simulation.tick`, `simulation.finance`, edifícios iniciais, estado ativo/inativo recalculado e cenário **Active**; mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
 
-O mapa completo é redesenhado após construção válida, execução válida do advisor, reset, tick de simulação, toggle de overlay ou redimensionamento. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Pan usa botão do meio ou **Space** + drag esquerdo sem construir ao soltar; zoom usa roda do rato ou botões e respeita limites. Não há rotação, demolição, walkers/pathfinding, commute, salários, impostos, migração, desirability, mini-map, inércia de câmara, múltiplos tipos de comida, backend, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial silenciosa, persistência de recomendações, arquivo de reports, campanhas, múltiplos cenários, eventos ou save/load.
+O mapa completo é redesenhado após construção válida, execução válida do advisor, reset, tick de simulação, toggle de overlay ou redimensionamento. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Pan usa botão do meio ou **Space** + drag esquerdo sem construir ao soltar; zoom usa roda do rato ou botões e respeita limites. Não há rotação, demolição, walkers/pathfinding, commute, salários, tax collectors, migração, desirability, mini-map, inércia de câmara, múltiplos tipos de comida, backend, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial silenciosa, persistência de recomendações, arquivo de reports, campanhas, múltiplos cenários, eventos ou save/load.
 
-Verificação manual: construir Road num tile vazio (saldo 496), selecionar House e clicar no mesmo tile (erro, saldo 496), construir Farm, Granary e Market em tiles vazios. Com poucas casas e workplaces demais, alguns workplaces ficam inativos; farms inativas não aumentam comida, granaries inativas não aumentam capacidade e markets inativos não dão cobertura de comida. Reset deve restaurar saldo 500, comida 0, tick 0 e a cidade seedada.
+Verificação manual: construir Road num tile vazio (saldo 496), selecionar House e clicar no mesmo tile (erro, saldo 496), construir Farm, Granary e Market em tiles vazios. Com poucas casas e workplaces demais, alguns workplaces ficam inativos; farms inativas não aumentam comida, granaries inativas não aumentam capacidade e markets inativos não dão cobertura de comida, mas todas continuam a pagar upkeep a cada 10 ticks. Reset deve restaurar saldo 500, comida 0, tick 0, período financeiro 0 e a cidade seedada.
 
 ## Cenário
 
@@ -134,5 +136,6 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 - [Plano da Fase 12](documentation/phase-12-development-plan.md)
 - [MVP](documentation/mvp.md)
 - [Plano da Fase 14](documentation/phase-14-development-plan.md)
+- [Plano da Fase 15](documentation/phase-15-development-plan.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)

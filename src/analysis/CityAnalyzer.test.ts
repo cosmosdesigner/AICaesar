@@ -15,7 +15,7 @@ function createEmptyCity(width = 8, height = 8): CityState {
     tiles,
     buildings: [],
     resources: { money: 500, food: 0 },
-    simulation: { tick: 0 },
+    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
   };
 }
 
