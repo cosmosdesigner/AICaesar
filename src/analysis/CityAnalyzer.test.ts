@@ -14,7 +14,7 @@ function createEmptyCity(width = 8, height = 8): CityState {
     height,
     tiles,
     buildings: [],
-    resources: { money: 500, food: 0 },
+    resources: { money: 500 },
     simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
   };
 }
@@ -56,6 +56,31 @@ describe('CityAnalyzer', () => {
     expect(issueTypes).toContain('food_shortage');
     expect(issueTypes).toContain('food_production_shortage');
     expect(summarizeCity(city).housesWithoutFood).toBe(1);
+  });
+
+  it('explains missing food storage before production can feed houses', () => {
+    const city = createEmptyCity();
+    addBuilding(city, 'road', 1, 2);
+    addBuilding(city, 'house', 2, 2, { level: 2, hasFood: false });
+    addBuilding(city, 'well', 2, 4);
+    addBuilding(city, 'farm', 4, 2, { active: true });
+
+    const issue = analyzeCity(city).find((candidate) => candidate.type === 'food_production_shortage');
+
+    expect(issue?.cause).toContain('granary');
+  });
+
+  it('detects distribution failure when granary food cannot reach houses through markets', () => {
+    const city = createEmptyCity();
+    addBuilding(city, 'road', 1, 2);
+    addBuilding(city, 'house', 2, 2, { level: 2, hasFood: false });
+    addBuilding(city, 'well', 2, 4);
+    addBuilding(city, 'granary', 4, 2, { active: true, storedFood: 12 });
+    addBuilding(city, 'market', 7, 7, { active: true, storedFood: 0 });
+
+    const issue = analyzeCity(city).find((candidate) => candidate.type === 'food_distribution_shortage');
+
+    expect(issue?.cause).toContain('market');
   });
 
   it('detects worker shortage deterministically', () => {

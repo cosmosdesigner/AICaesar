@@ -22,7 +22,7 @@ describe('createCityState', () => {
     expect(counts.granary).toBeGreaterThanOrEqual(1);
     expect(counts.market).toBeGreaterThanOrEqual(1);
     expect(city.resources.money).toBe(INITIAL_MONEY);
-    expect(city.resources.food).toBe(0);
+    expect('food' in city.resources).toBe(false);
     expect(city.simulation.tick).toBe(0);
   });
 
@@ -48,7 +48,7 @@ describe('createCityState', () => {
       farms: 1,
       granaries: 1,
       markets: 1,
-      foodCapacity: 100,
+      foodCapacity: 140,
       foodStored: 2,
     });
   });

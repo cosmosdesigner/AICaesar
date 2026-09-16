@@ -29,7 +29,6 @@ export interface Building {
 
 export interface ResourceState {
   money: number;
-  food: number;
 }
 
 export interface FinanceState {
@@ -67,7 +66,7 @@ export function createCityState(): CityState {
     height: MAP_HEIGHT,
     tiles,
     buildings: [],
-    resources: { money: INITIAL_MONEY, food: 0 },
+    resources: { money: INITIAL_MONEY },
     simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
   };
 
@@ -144,7 +143,7 @@ function addBuilding(city: CityState, x: number, y: number, type: BuildingType):
         x,
         y,
         ...(type === 'farm' || type === 'granary' || type === 'market' ? { active: false } : {}),
-        ...(type === 'granary' ? { storedFood: 0 } : {}),
+        ...(type === 'granary' || type === 'market' ? { storedFood: 0 } : {}),
       };
   tile.buildingId = building.id;
   city.buildings.push(building);

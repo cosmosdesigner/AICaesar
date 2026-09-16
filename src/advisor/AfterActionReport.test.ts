@@ -16,7 +16,7 @@ function createEmptyCity(width = 8, height = 8, money = 500): CityState {
     height,
     tiles,
     buildings: [],
-    resources: { money, food: 0 },
+    resources: { money },
     simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
   };
 }
@@ -82,10 +82,9 @@ function createSnapshot(overrides: Partial<CityMetricsSnapshot> = {}): CityMetri
 describe('AfterActionReport', () => {
   it('creates a city metrics snapshot from money, food, houses, workers, workplaces, and issues', () => {
     const city = createEmptyCity(8, 8, 321);
-    city.resources.food = 12;
     addBuilding(city, 'road', 1, 2);
     addBuilding(city, 'house', 2, 2, { level: 2, hasFood: false });
-    addBuilding(city, 'granary', 1, 3, { active: true, storedFood: 0 });
+    addBuilding(city, 'granary', 1, 3, { active: true, storedFood: 12 });
 
     expect(createCityMetricsSnapshot(city)).toEqual({
       money: 321,

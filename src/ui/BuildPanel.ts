@@ -53,6 +53,10 @@ export class BuildPanel {
   private readonly blockedByFood = document.createElement('strong');
   private readonly degradingHouses = document.createElement('strong');
   private readonly foodStored = document.createElement('strong');
+  private readonly granaryStock = document.createElement('strong');
+  private readonly marketStock = document.createElement('strong');
+  private readonly marketDemand = document.createElement('strong');
+  private readonly suppliedMarkets = document.createElement('strong');
   private readonly farms = document.createElement('strong');
   private readonly granaries = document.createElement('strong');
   private readonly markets = document.createElement('strong');
@@ -119,7 +123,11 @@ export class BuildPanel {
       this.createStat('Nível 2', this.housesLevelTwo),
       this.createStat('Nível 3', this.housesLevelThree),
       this.createStat('Tiles com água', this.waterTiles),
-      this.createStat('Comida', this.foodStored),
+      this.createStat('Comida total', this.foodStored),
+      this.createStat('Granary stock', this.granaryStock),
+      this.createStat('Market stock', this.marketStock),
+      this.createStat('Market demand', this.marketDemand),
+      this.createStat('Supplied markets', this.suppliedMarkets),
       this.createStat('Farms', this.farms),
       this.createStat('Granaries', this.granaries),
       this.createStat('Markets', this.markets),
@@ -232,6 +240,10 @@ export class BuildPanel {
     this.blockedByFood.textContent = String(housingStats.blockedByFood);
     this.degradingHouses.textContent = String(housingStats.degradingHouses);
     this.foodStored.textContent = `${foodStats.foodStored}/${foodStats.foodCapacity}`;
+    this.granaryStock.textContent = `${foodStats.granaryFood}/${foodStats.granaryCapacity}`;
+    this.marketStock.textContent = `${foodStats.marketFood}/${foodStats.marketCapacity}`;
+    this.marketDemand.textContent = String(foodStats.marketDemand);
+    this.suppliedMarkets.textContent = `${foodStats.suppliedMarkets}/${foodStats.markets}`;
     this.farms.textContent = String(foodStats.farms);
     this.granaries.textContent = String(foodStats.granaries);
     this.markets.textContent = String(foodStats.markets);

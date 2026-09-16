@@ -14,8 +14,11 @@ type WorkplaceBuilding = Building & { readonly type: WorkplaceType };
 
 export const WATER_RADIUS = 3;
 export const MARKET_FOOD_RADIUS = 4;
+export const MARKET_SUPPLY_RADIUS = 8;
 export const FARM_FOOD_PER_TICK = 2;
-export const GRANARY_CAPACITY = 100;
+export const GRANARY_FOOD_CAPACITY = 100;
+export const MARKET_FOOD_CAPACITY = 40;
+export const MARKET_RESTOCK_PER_TICK = 4;
 export const HOUSE_FOOD_CONSUMPTION_INTERVAL = 2;
 export const FINANCE_INTERVAL_TICKS = 10;
 export const BUILDING_UPKEEP: Readonly<Partial<Record<BuildingType, number>>> = {
@@ -54,8 +57,14 @@ export interface FoodStats {
   readonly farms: number;
   readonly granaries: number;
   readonly markets: number;
+  readonly granaryFood: number;
+  readonly granaryCapacity: number;
+  readonly marketFood: number;
+  readonly marketCapacity: number;
+  readonly marketDemand: number;
   readonly foodStored: number;
   readonly foodCapacity: number;
+  readonly suppliedMarkets: number;
   readonly housesWithFood: number;
   readonly foodCoveredTiles: number;
 }
@@ -84,24 +93,23 @@ export function simulateTick(city: CityState): void {
   city.simulation.tick += 1;
   assignWorkers(city);
   produceFood(city);
+  restockMarkets(city);
 
   const waterCoverage = getWaterCoveredTiles(city);
-  const foodCoverage = getFoodCoveredTiles(city);
   const shouldConsumeFood = city.simulation.tick % HOUSE_FOOD_CONSUMPTION_INTERVAL === 0;
-  let availableFood = city.resources.food;
 
   const houses = city.buildings
     .filter((building) => building.type === 'house')
-    .sort((a, b) => a.y - b.y || a.x - b.x);
+    .sort(compareBuildingsByPosition);
 
   for (const building of houses) {
     building.hasRoadAccess = hasAdjacentRoad(city, building);
     building.hasWater = waterCoverage.has(getTileKey(building.x, building.y));
 
-    const isFoodCovered = foodCoverage.has(getTileKey(building.x, building.y));
-    if (isFoodCovered && availableFood > 0) {
+    const market = getHouseFoodMarket(city, building);
+    if (market) {
       building.hasFood = true;
-      if (shouldConsumeFood) availableFood -= 1;
+      if (shouldConsumeFood) market.storedFood = Math.max(0, getStoredFood(market) - 1);
     } else {
       building.hasFood = false;
     }
@@ -113,7 +121,6 @@ export function simulateTick(city: CityState): void {
     });
   }
 
-  if (shouldConsumeFood) city.resources.food = availableFood;
   assignWorkers(city);
   if (city.simulation.tick % FINANCE_INTERVAL_TICKS === 0) applyFinancePeriod(city);
 }
@@ -177,11 +184,26 @@ export function getWaterCoveredTiles(city: CityState): Set<string> {
 }
 
 export function getFoodCoveredTiles(city: CityState): Set<string> {
-  return getRadiusCoverage(city, 'market', MARKET_FOOD_RADIUS, true);
+  const coverage = new Set<string>();
+
+  for (const market of getActiveBuildings(city, 'market')) {
+    if (getStoredFood(market) <= 0) continue;
+    addRadiusCoverage(city, coverage, market, MARKET_FOOD_RADIUS);
+  }
+
+  return coverage;
+}
+
+export function getGranaryFoodCapacity(city: CityState): number {
+  return countActiveBuildings(city, 'granary') * GRANARY_FOOD_CAPACITY;
+}
+
+export function getMarketFoodCapacity(city: CityState): number {
+  return countActiveBuildings(city, 'market') * MARKET_FOOD_CAPACITY;
 }
 
 export function getFoodCapacity(city: CityState): number {
-  return countActiveBuildings(city, 'granary') * GRANARY_CAPACITY;
+  return getGranaryFoodCapacity(city) + getMarketFoodCapacity(city);
 }
 
 export function assignWorkers(city: CityState): void {
@@ -295,16 +317,54 @@ export function getHousingStats(city: CityState): HousingStats {
   };
 }
 
+export function getGranaryStoredFood(city: CityState): number {
+  return city.buildings.reduce((total, building) => (
+    building.type === 'granary' ? total + getStoredFood(building) : total
+  ), 0);
+}
+
+export function getMarketStoredFood(city: CityState): number {
+  return city.buildings.reduce((total, building) => (
+    building.type === 'market' ? total + getStoredFood(building) : total
+  ), 0);
+}
+
+export function getMarketFoodDemand(market: Building): number {
+  return Math.max(0, MARKET_FOOD_CAPACITY - getStoredFood(market));
+}
+
+export function getMarketSupplyCandidates(city: CityState, market: Building): Building[] {
+  return getActiveBuildings(city, 'granary')
+    .filter((granary) => getStoredFood(granary) > 0
+      && getManhattanDistance(granary, market) <= MARKET_SUPPLY_RADIUS)
+    .sort((a, b) => (
+      getManhattanDistance(a, market) - getManhattanDistance(b, market)
+      || compareBuildingsByPosition(a, b)
+    ));
+}
+
 export function getFoodStats(city: CityState): FoodStats {
   const housingStats = getHousingStats(city);
   const foodCoverage = getFoodCoveredTiles(city);
+  const granaryFood = getGranaryStoredFood(city);
+  const marketFood = getMarketStoredFood(city);
+  const granaryCapacity = getGranaryFoodCapacity(city);
+  const marketCapacity = getMarketFoodCapacity(city);
 
   return {
     farms: countBuildings(city, 'farm'),
     granaries: countBuildings(city, 'granary'),
     markets: countBuildings(city, 'market'),
-    foodStored: city.resources.food,
-    foodCapacity: getFoodCapacity(city),
+    granaryFood,
+    granaryCapacity,
+    marketFood,
+    marketCapacity,
+    marketDemand: getActiveBuildings(city, 'market')
+      .reduce((total, market) => total + getMarketFoodDemand(market), 0),
+    foodStored: granaryFood + marketFood,
+    foodCapacity: granaryCapacity + marketCapacity,
+    suppliedMarkets: getActiveBuildings(city, 'market')
+      .filter((market) => getStoredFood(market) > 0).length,
     housesWithFood: housingStats.housesWithFood,
     foodCoveredTiles: foodCoverage.size,
   };
@@ -315,16 +375,60 @@ export function getTileKey(x: number, y: number): string {
 }
 
 function produceFood(city: CityState): void {
-  const capacity = getFoodCapacity(city);
-  if (capacity === 0) {
-    city.resources.food = 0;
-    return;
-  }
+  const granaries = getActiveBuildings(city, 'granary')
+    .sort(compareBuildingsByPosition);
+  if (granaries.length === 0) return;
 
-  city.resources.food = Math.min(
-    capacity,
-    city.resources.food + countActiveBuildings(city, 'farm') * FARM_FOOD_PER_TICK,
-  );
+  const farms = getActiveBuildings(city, 'farm')
+    .sort(compareBuildingsByPosition);
+  for (let farmIndex = 0; farmIndex < farms.length; farmIndex++) {
+    let remainingFood = FARM_FOOD_PER_TICK;
+    for (const granary of granaries) {
+      const space = GRANARY_FOOD_CAPACITY - getStoredFood(granary);
+      if (space <= 0) continue;
+      const stored = Math.min(space, remainingFood);
+      granary.storedFood = getStoredFood(granary) + stored;
+      remainingFood -= stored;
+      if (remainingFood === 0) break;
+    }
+  }
+}
+
+function restockMarkets(city: CityState): void {
+  const markets = getActiveBuildings(city, 'market')
+    .sort(compareBuildingsByPosition);
+
+  for (const market of markets) {
+    let remainingDemand = Math.min(MARKET_RESTOCK_PER_TICK, getMarketFoodDemand(market));
+    if (remainingDemand === 0) continue;
+
+    for (const granary of getMarketSupplyCandidates(city, market)) {
+      const transferred = Math.min(remainingDemand, getStoredFood(granary));
+      if (transferred <= 0) continue;
+      granary.storedFood = getStoredFood(granary) - transferred;
+      market.storedFood = getStoredFood(market) + transferred;
+      remainingDemand -= transferred;
+      if (remainingDemand === 0) break;
+    }
+  }
+}
+
+function getHouseFoodMarket(city: CityState, house: Building): Building | undefined {
+  return getActiveBuildings(city, 'market')
+    .filter((market) => getStoredFood(market) > 0
+      && getManhattanDistance(market, house) <= MARKET_FOOD_RADIUS)
+    .sort((a, b) => (
+      getManhattanDistance(a, house) - getManhattanDistance(b, house)
+      || compareBuildingsByPosition(a, b)
+    ))[0];
+}
+
+function getStoredFood(building: Building): number {
+  return Math.max(0, building.storedFood ?? 0);
+}
+
+function getManhattanDistance(a: Building, b: Building): number {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
 function getHouseLevel(building: Building): HouseLevel {
@@ -382,17 +486,29 @@ function getRadiusCoverage(
     if (building.type !== sourceType) continue;
     if (activeOnly && building.active !== true) continue;
 
-    for (let dy = -radius; dy <= radius; dy++) {
-      const remainingRadius = radius - Math.abs(dy);
-      for (let dx = -remainingRadius; dx <= remainingRadius; dx++) {
-        const x = building.x + dx;
-        const y = building.y + dy;
-        if (getTile(city, x, y)) coverage.add(getTileKey(x, y));
-      }
-    }
+    addRadiusCoverage(city, coverage, building, radius);
   }
 
   return coverage;
+}
+
+function addRadiusCoverage(city: CityState, coverage: Set<string>, building: Building, radius: number): void {
+  for (let dy = -radius; dy <= radius; dy++) {
+    const remainingRadius = radius - Math.abs(dy);
+    for (let dx = -remainingRadius; dx <= remainingRadius; dx++) {
+      const x = building.x + dx;
+      const y = building.y + dy;
+      if (getTile(city, x, y)) coverage.add(getTileKey(x, y));
+    }
+  }
+}
+
+function getActiveBuildings(city: CityState, type: Building['type']): Building[] {
+  return city.buildings.filter((building) => building.type === type && building.active === true);
+}
+
+function compareBuildingsByPosition(a: Building, b: Building): number {
+  return a.y - b.y || a.x - b.x || a.id.localeCompare(b.id);
 }
 
 function countBuildings(city: CityState, type: Building['type']): number {

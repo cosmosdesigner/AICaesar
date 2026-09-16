@@ -24,7 +24,7 @@ function createEmptyCity(width = 8, height = 8): CityState {
     height,
     tiles,
     buildings: [],
-    resources: { money: 500, food: 0 },
+    resources: { money: 500 },
     simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 } },
   };
 }
@@ -120,14 +120,13 @@ describe('house evolution and degradation', () => {
 
   it('evolves a road, water and food served house from level 2 to level 3 after 5 ticks', () => {
     const city = createEmptyCity();
-    city.resources.food = 20;
     const house = addBuilding(city, 'house', 2, 2, { level: 2, upgradeProgress: 0, degradeProgress: 0 });
     addBuilding(city, 'house', 6, 4, { level: 3 });
     addBuilding(city, 'house', 6, 5, { level: 3 });
     addBuilding(city, 'road', 1, 2);
     addBuilding(city, 'well', 2, 4);
     addBuilding(city, 'granary', 6, 6, { active: false });
-    addBuilding(city, 'market', 4, 2, { active: false });
+    addBuilding(city, 'market', 4, 2, { active: false, storedFood: 20 });
 
     tick(city, HOUSE_SPECIFICATIONS[3].upgradeTicks - 1);
     expect(house.level).toBe(2);
@@ -169,7 +168,6 @@ describe('house evolution and degradation', () => {
 
   it('cancels pending degradation when services recover before the limit', () => {
     const city = createEmptyCity();
-    city.resources.food = 20;
     const house = addBuilding(city, 'house', 2, 2, { level: 3, upgradeProgress: 0, degradeProgress: 0 });
     addBuilding(city, 'road', 1, 2);
     addBuilding(city, 'well', 2, 4);
@@ -180,8 +178,7 @@ describe('house evolution and degradation', () => {
     expect(house.degradeProgress).toBe(3);
 
     addBuilding(city, 'granary', 6, 6, { active: false });
-    addBuilding(city, 'market', 4, 2, { active: false });
-    city.resources.food = 20;
+    addBuilding(city, 'market', 4, 2, { active: false, storedFood: 20 });
     simulateTick(city);
 
     expect(house.level).toBe(3);

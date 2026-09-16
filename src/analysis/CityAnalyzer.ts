@@ -116,25 +116,28 @@ export function analyzeCity(city: CityState): CityIssue[] {
   }
 
   const activeFarms = countBuildings(city, 'farm', true);
-  if (summary.houses > 0 && ((foodStats.markets > 0 && activeFarms === 0)
-    || (foodStats.foodStored === 0 && housesWithoutFood.length > 0 && foodExpected))) {
+  const needsFood = summary.houses > 0 && housesWithoutFood.length > 0 && foodExpected;
+  if (needsFood && (activeFarms === 0 || foodStats.granaryCapacity === 0 || foodStats.granaryFood === 0)) {
+    const cause = foodStats.granaryCapacity === 0
+      ? 'Farms precisam de pelo menos um granary ativo com capacidade antes de abastecer casas.'
+      : 'Não há farms ativas suficientes ou produção armazenada em granary para abastecer as casas.';
     issues.push({
       type: 'food_production_shortage',
-      severity: foodStats.markets > 0 && activeFarms === 0 ? 'medium' : 'low',
-      affectedTiles: toTiles(getSortedBuildings(city, 'farm')),
-      explanation: 'Produção de comida insuficiente.',
-      cause: 'Não há farms ativas suficientes para abastecer as casas.',
+      severity: activeFarms === 0 ? 'medium' : 'low',
+      affectedTiles: toTiles(getSortedBuildings(city, activeFarms === 0 ? 'farm' : 'granary')),
+      explanation: 'Produção ou armazenamento de comida insuficiente.',
+      cause,
     });
   }
 
   const foodCoveredTiles = getFoodCoveredTiles(city).size;
-  if (foodStats.foodStored > 0 && housesWithoutFood.length > 0 && foodCoveredTiles === 0) {
+  if (needsFood && foodStats.granaryFood > 0 && (foodStats.marketFood === 0 || foodCoveredTiles === 0)) {
     issues.push({
       type: 'food_distribution_shortage',
       severity: shortageSeverity(housesWithoutFood.length, summary.houses),
       affectedTiles: toTiles(housesWithoutFood),
       explanation: 'Comida armazenada não chega às casas.',
-      cause: 'Não há markets ativos com cobertura de comida.',
+      cause: 'Granary tem comida, mas nenhum market ativo com stock e alcance serve estas casas.',
     });
   }
 
