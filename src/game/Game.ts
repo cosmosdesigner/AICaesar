@@ -8,12 +8,18 @@ import { createCityState, placeBuilding, type BuildResult } from '../simulation/
 import { assignWorkers, simulateTick } from '../simulation/Simulation';
 import { BuildPanel, BUILD_LABELS } from '../ui/BuildPanel';
 import { AdvisorPanel } from '../ui/AdvisorPanel';
+import { ObjectivesPanel } from '../ui/ObjectivesPanel';
+import { SimulationControls } from '../ui/SimulationControls';
+import { getSimulationIntervalMs, type SimulationSpeed } from './SimulationSpeed';
 
 export async function startGame(host: HTMLElement, panelHost: HTMLElement): Promise<() => void> {
   let city = createCityState();
   assignWorkers(city);
   let waterOverlay = false;
   let foodOverlay = false;
+  let paused = false;
+  let speed: SimulationSpeed = 1;
+  let tickHandle: number | undefined;
   const textures = await loadMapTextures();
   const app = await createPixiApp(host);
   const map = new MapRenderer(city, textures);
@@ -38,6 +44,20 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       return foodOverlay;
     },
   );
+  const simulationControls = new SimulationControls(
+    panelHost,
+    () => {
+      paused = !paused;
+      scheduleTick();
+      return paused;
+    },
+    (nextSpeed) => {
+      speed = nextSpeed;
+      scheduleTick();
+    },
+  );
+  simulationControls.update(paused, speed);
+  const objectives = new ObjectivesPanel(panelHost);
   const advisor = new AdvisorPanel(panelHost, () => city, {
     onApprovePlan: (plan) => {
       const result = approveAdvisorPlan(city, plan);
@@ -82,21 +102,33 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     panel.update(city, message, waterOverlay, foodOverlay);
     app.render();
   }
+
+  function scheduleTick(): void {
+    if (tickHandle !== undefined) {
+      window.clearInterval(tickHandle);
+      tickHandle = undefined;
+    }
+    if (paused) return;
+
+    tickHandle = window.setInterval(() => {
+      simulateTick(city);
+      map.refresh(city, { waterOverlay, foodOverlay });
+      panel.update(city, 'Simulação atualizada.', waterOverlay, foodOverlay);
+      app.render();
+    }, getSimulationIntervalMs(speed));
+  }
+
   const observer = new ResizeObserver(resize);
   observer.observe(host);
   resize();
-
-  const tickHandle = window.setInterval(() => {
-    simulateTick(city);
-    map.refresh(city, { waterOverlay, foodOverlay });
-    panel.update(city, 'Simulação atualizada.', waterOverlay, foodOverlay);
-    app.render();
-  }, 1000);
+  scheduleTick();
 
   return () => {
-    window.clearInterval(tickHandle);
+    if (tickHandle !== undefined) window.clearInterval(tickHandle);
     observer.disconnect();
     panel.destroy();
+    simulationControls.destroy();
+    objectives.destroy();
     advisor.destroy();
     app.destroy(true, { children: true });
   };

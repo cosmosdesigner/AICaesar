@@ -16,7 +16,9 @@ header > p, footer { color: #a8b5ab; font-size: 13px; }
 header span { color: #667b6d; padding: 0 10px; }
 main { padding: 0 16px; }
 .build-panel,
-.advisor-panel {
+.advisor-panel,
+.simulation-controls,
+.objectives-panel {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -28,11 +30,14 @@ main { padding: 0 16px; }
   border-radius: 6px;
   font-size: 14px;
 }
-.advisor-panel {
+.advisor-panel,
+.objectives-panel {
   align-items: flex-start;
 }
 .advisor-panel h2,
-.advisor-panel h3 {
+.advisor-panel h3,
+.simulation-controls h2,
+.objectives-panel h2 {
   margin: 0;
   font-size: 16px;
 }
@@ -44,7 +49,8 @@ main { padding: 0 16px; }
   flex: 1 1 180px;
 }
 .advisor-panel ul,
-.advisor-panel ol {
+.advisor-panel ol,
+.objectives-panel ol {
   margin: 6px 0 0 20px;
   padding: 0;
 }
@@ -60,8 +66,11 @@ main { padding: 0 16px; }
 .after-action-report p {
   margin-top: 6px;
 }
-.advisor-controls {
+.advisor-controls,
+.speed-controls {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 .advisor-status {

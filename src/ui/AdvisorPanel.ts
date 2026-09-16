@@ -50,6 +50,7 @@ export class AdvisorPanel {
     const analyze = document.createElement('button');
     analyze.type = 'button';
     analyze.textContent = 'Analyze city';
+    analyze.title = 'Analyze city issues and request a local advisor plan.';
     analyze.addEventListener('click', () => {
       void this.analyzeCity();
     });
@@ -57,6 +58,7 @@ export class AdvisorPanel {
     const approve = document.createElement('button');
     approve.type = 'button';
     approve.textContent = 'Approve';
+    approve.title = 'Approve and execute the current validated advisor plan.';
     approve.addEventListener('click', () => {
       if (this.plan === undefined) {
         this.status.textContent = 'No advisor plan to approve.';
@@ -81,6 +83,7 @@ export class AdvisorPanel {
     const reject = document.createElement('button');
     reject.type = 'button';
     reject.textContent = 'Reject';
+    reject.title = 'Reject the current advisor plan without changing the city.';
     reject.addEventListener('click', () => {
       this.plan = undefined;
       this.report = undefined;

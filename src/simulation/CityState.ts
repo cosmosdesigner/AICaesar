@@ -103,9 +103,12 @@ export function placeBuilding(city: CityState, x: number, y: number, type: Build
 }
 
 function getSeedBuildingType(x: number, y: number): BuildingType | undefined {
-  if (y === 15 && x >= 7 && x <= 22) return 'road';
-  if ((y === 14 || y === 16) && (x === 10 || x === 13 || x === 19)) return 'house';
+  if (y === 15 && x >= 5 && x <= 24) return 'road';
+  if ((y === 14 || y === 16) && (x === 8 || x === 10 || x === 12 || x === 14)) return 'house';
   if (x === 16 && y === 14) return 'well';
+  if (x === 18 && y === 16) return 'farm';
+  if (x === 20 && y === 14) return 'granary';
+  if (x === 22 && y === 16) return 'market';
   return undefined;
 }
 

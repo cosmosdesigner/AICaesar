@@ -12,6 +12,15 @@ export const BUILD_LABELS: Readonly<Record<BuildingType, string>> = {
   market: 'Market',
 };
 
+const BUILD_TITLES: Readonly<Record<BuildingType, string>> = {
+  road: 'Roads connect services and buildings.',
+  house: 'Houses increase population and available workers.',
+  well: 'Wells provide water coverage to nearby houses.',
+  farm: 'Farms produce food when enough workers are available.',
+  granary: 'Granaries add food storage capacity when active.',
+  market: 'Markets distribute stored food to nearby houses when active.',
+};
+
 const BUILD_TOOLS: readonly BuildingType[] = ['road', 'house', 'well', 'farm', 'granary', 'market'];
 
 export class BuildPanel {
@@ -71,6 +80,7 @@ export class BuildPanel {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = `${BUILD_LABELS[tool]} (${BUILD_COSTS[tool]})`;
+      button.title = BUILD_TITLES[tool];
       button.setAttribute('aria-pressed', String(tool === this.selectedTool));
       button.addEventListener('click', () => {
         this.selectedTool = tool;
@@ -108,21 +118,27 @@ export class BuildPanel {
     );
 
     this.waterOverlay.type = 'button';
-    this.waterOverlay.textContent = 'Water overlay: Off';
+    this.waterOverlay.textContent = 'Show water coverage: Off';
+    this.waterOverlay.title = 'Toggle tiles covered by wells.';
     this.waterOverlay.setAttribute('aria-pressed', 'false');
     this.waterOverlay.addEventListener('click', () => {
       const enabled = onWaterOverlayToggle();
       this.setWaterOverlay(enabled);
-      this.status.textContent = enabled ? 'Overlay de água ligado.' : 'Overlay de água desligado.';
+      this.status.textContent = enabled
+        ? 'Water coverage overlay shows tiles served by wells.'
+        : 'Water coverage overlay hidden.';
     });
 
     this.foodOverlay.type = 'button';
-    this.foodOverlay.textContent = 'Food overlay: Off';
+    this.foodOverlay.textContent = 'Show food coverage: Off';
+    this.foodOverlay.title = 'Toggle tiles covered by active markets.';
     this.foodOverlay.setAttribute('aria-pressed', 'false');
     this.foodOverlay.addEventListener('click', () => {
       const enabled = onFoodOverlayToggle();
       this.setFoodOverlay(enabled);
-      this.status.textContent = enabled ? 'Overlay de comida ligado.' : 'Overlay de comida desligado.';
+      this.status.textContent = enabled
+        ? 'Food coverage overlay shows active market reach and hungry houses.'
+        : 'Food coverage overlay hidden.';
     });
 
     this.issues.className = 'city-issues';
@@ -131,6 +147,7 @@ export class BuildPanel {
     const reset = document.createElement('button');
     reset.type = 'button';
     reset.textContent = 'Reset';
+    reset.title = 'Reset city money, buildings and simulation tick.';
     reset.addEventListener('click', onReset);
     this.status.className = 'build-status';
     this.status.setAttribute('role', 'status');
@@ -205,12 +222,12 @@ export class BuildPanel {
   }
 
   private setWaterOverlay(enabled: boolean): void {
-    this.waterOverlay.textContent = `Water overlay: ${enabled ? 'On' : 'Off'}`;
+    this.waterOverlay.textContent = `Show water coverage: ${enabled ? 'On' : 'Off'}`;
     this.waterOverlay.setAttribute('aria-pressed', String(enabled));
   }
 
   private setFoodOverlay(enabled: boolean): void {
-    this.foodOverlay.textContent = `Food overlay: ${enabled ? 'On' : 'Off'}`;
+    this.foodOverlay.textContent = `Show food coverage: ${enabled ? 'On' : 'Off'}`;
     this.foodOverlay.setAttribute('aria-pressed', String(enabled));
   }
 }
