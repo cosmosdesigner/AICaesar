@@ -34,6 +34,15 @@ main { padding: 0 16px; }
   gap: 8px 14px;
   color: #a8b5ab;
 }
+.city-issues {
+  flex-basis: 100%;
+  color: #d9d0aa;
+}
+.city-issues ol {
+  margin: 6px 0 0 20px;
+  padding: 0;
+}
+.city-issues p { margin-top: 6px; color: #a8b5ab; }
 button {
   font: inherit;
   color: inherit;

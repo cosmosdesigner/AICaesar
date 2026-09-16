@@ -1,3 +1,4 @@
+import { analyzeCity } from '../analysis/CityAnalyzer';
 import { BUILD_COSTS, type CityState } from '../simulation/CityState';
 import { getFoodStats, getHousingStats, getWorkforceStats } from '../simulation/Simulation';
 import type { BuildingType } from '../simulation/Tile';
@@ -39,6 +40,9 @@ export class BuildPanel {
   private readonly workerShortage = document.createElement('strong');
   private readonly activeWorkplaces = document.createElement('strong');
   private readonly inactiveWorkplaces = document.createElement('strong');
+  private readonly issues = document.createElement('div');
+  private readonly issuesMessage = document.createElement('p');
+  private readonly issuesList = document.createElement('ol');
   private readonly waterOverlay = document.createElement('button');
   private readonly foodOverlay = document.createElement('button');
   private readonly status = document.createElement('p');
@@ -121,6 +125,9 @@ export class BuildPanel {
       this.status.textContent = enabled ? 'Overlay de comida ligado.' : 'Overlay de comida desligado.';
     });
 
+    this.issues.className = 'city-issues';
+    this.issues.append('Principais problemas:', this.issuesMessage, this.issuesList);
+
     const reset = document.createElement('button');
     reset.type = 'button';
     reset.textContent = 'Reset';
@@ -135,6 +142,7 @@ export class BuildPanel {
       stats,
       this.waterOverlay,
       this.foodOverlay,
+      this.issues,
       reset,
       this.status,
     );
@@ -169,6 +177,20 @@ export class BuildPanel {
     this.inactiveWorkplaces.textContent = String(workforceStats.inactiveWorkplaces);
     this.setWaterOverlay(waterOverlay);
     this.setFoodOverlay(foodOverlay);
+    const issues = analyzeCity(city).slice(0, 3);
+    this.issuesList.replaceChildren();
+    if (issues.length === 0) {
+      this.issuesMessage.textContent = 'Sem problemas críticos detetados.';
+      this.issuesList.hidden = true;
+    } else {
+      this.issuesMessage.textContent = '';
+      this.issuesList.hidden = false;
+      for (const issue of issues) {
+        const item = document.createElement('li');
+        item.textContent = `[${issue.severity}] ${issue.explanation} ${issue.cause}`;
+        this.issuesList.append(item);
+      }
+    }
     this.status.textContent = message;
   }
 
