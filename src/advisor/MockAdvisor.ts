@@ -173,7 +173,7 @@ export function createMockAdvisorPlan(
   });
 }
 
-function selectStrategicIssue(issues: readonly CityIssue[], scenario: ScenarioProgress | undefined): CityIssue | undefined {
+export function selectStrategicIssue(issues: readonly CityIssue[], scenario: ScenarioProgress | undefined): CityIssue | undefined {
   const incomplete = new Set(scenario?.objectives.filter((objective) => !objective.completed).map((objective) => objective.id));
   return issues.find((issue) => (
     (incomplete.has('food-coverage') && isFoodIssue(issue))

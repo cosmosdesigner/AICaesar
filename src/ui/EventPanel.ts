@@ -22,15 +22,15 @@ export class EventPanel {
     this.element.setAttribute('aria-label', 'Events');
 
     const title = document.createElement('h2');
-    title.textContent = 'Events';
+    title.textContent = 'Eventos';
     this.events.setAttribute('aria-label', 'Active events');
     this.request.className = 'imperial-request';
     this.fulfil.type = 'button';
-    this.fulfil.textContent = 'Fulfil request';
-    this.fulfil.title = 'Deliver the requested food and receive the imperial reward.';
+    this.fulfil.textContent = 'Cumprir pedido';
+    this.fulfil.title = 'Entregar a comida pedida e receber a recompensa imperial.';
     this.fulfil.addEventListener('click', () => {
       if (!canFulfillImperialRequest(this.getCity())) {
-        this.status.textContent = 'Not enough food to fulfil the imperial request.';
+        this.status.textContent = 'Comida insuficiente para cumprir o pedido imperial.';
         this.update(this.getCity());
         return;
       }
@@ -44,7 +44,7 @@ export class EventPanel {
     this.status.setAttribute('role', 'status');
 
     const messagesTitle = document.createElement('h3');
-    messagesTitle.textContent = 'Recent messages';
+    messagesTitle.textContent = 'Mensagens recentes';
     this.element.append(title, this.events, this.request, this.fulfil, this.status, messagesTitle, this.messages);
     host.append(this.element);
   }
@@ -54,7 +54,7 @@ export class EventPanel {
     this.events.replaceChildren();
     if (eventSummaries.length === 0) {
       const item = document.createElement('li');
-      item.textContent = 'No active events.';
+      item.textContent = 'Não há eventos activos.';
       this.events.append(item);
     } else {
       for (const event of eventSummaries) {
@@ -69,7 +69,7 @@ export class EventPanel {
 
     const imperialRequest = getImperialRequestSummary(city);
     if (imperialRequest === undefined) {
-      this.request.textContent = 'No imperial request.';
+      this.request.textContent = 'Não há pedidos imperiais.';
       this.fulfil.hidden = true;
       this.fulfil.disabled = true;
     } else {
@@ -86,7 +86,7 @@ export class EventPanel {
     const history = city.simulation.events?.history ?? [];
     if (history.length === 0) {
       const item = document.createElement('li');
-      item.textContent = 'No messages yet.';
+      item.textContent = 'Ainda não há mensagens.';
       this.messages.append(item);
     } else {
       for (const message of history) {

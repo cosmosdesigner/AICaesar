@@ -20,6 +20,8 @@ const doubles = vi.hoisted(() => ({
   scenarioSelectorDestroy: vi.fn(),
   metricsPanelDestroy: vi.fn(),
   eventPanelDestroy: vi.fn(),
+  agoraDestroy: vi.fn(),
+  agoraPanelInstances: [] as Array<{ update: Mock }>,
   scenarioPanelInstances: [] as Array<{
     update: Mock;
     setDefinition: Mock;
@@ -229,6 +231,17 @@ vi.mock('../ui/MetricsPanel', () => ({
 }));
 
 
+vi.mock('../ui/AgoraPanel', () => ({
+  AgoraPanel: class AgoraPanel {
+    update = vi.fn();
+    destroy = doubles.agoraDestroy;
+
+    constructor() {
+      doubles.agoraPanelInstances.push({ update: this.update });
+    }
+  },
+}));
+
 vi.mock('../ui/EventPanel', () => ({
   EventPanel: class EventPanel {
     update = vi.fn();
@@ -306,6 +319,7 @@ describe('startGame camera and cleanup', () => {
     doubles.scenarioPanelInstances.length = 0;
     doubles.selectorInstances.length = 0;
     doubles.metricsPanelInstances.length = 0;
+    doubles.agoraPanelInstances.length = 0;
     doubles.advisorInstances.length = 0;
     doubles.saveLoadControlInstances.length = 0;
     doubles.persistenceSave.mockReturnValue({ ok: true, message: 'City saved locally.' });
@@ -343,6 +357,7 @@ describe('startGame camera and cleanup', () => {
     const cleanup = await startGame(host, panelHost);
     cleanup();
 
+    expect(doubles.agoraDestroy).toHaveBeenCalledOnce();
     expect(doubles.cameraControlsDestroy).toHaveBeenCalledOnce();
     expect(doubles.simulationControlsDestroy).toHaveBeenCalledOnce();
     expect(doubles.buildPanelDestroy).toHaveBeenCalledOnce();
@@ -353,6 +368,19 @@ describe('startGame camera and cleanup', () => {
     expect(doubles.advisorDestroy).toHaveBeenCalledOnce();
     expect(doubles.saveLoadControlsDestroy).toHaveBeenCalledOnce();
     expect(doubles.appDestroy).toHaveBeenCalledWith(true, { children: true });
+  });
+
+  it('refreshes the Agora summary through the central city refresh flow', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+
+    expect(doubles.agoraPanelInstances[0]?.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: { tone: 'active', text: 'Cenário em curso.' },
+      objective: expect.objectContaining({ label: 'Population' }),
+    }));
+    cleanup();
   });
 
   it('saves the current city and loads a validated replacement through the central refresh flow', async () => {

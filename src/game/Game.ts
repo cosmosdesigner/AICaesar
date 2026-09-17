@@ -24,6 +24,7 @@ import {
 import { assignWorkers, simulateTick } from '../simulation/Simulation';
 import { fulfillImperialRequest } from '../events/Events';
 import { loadCityState, saveCityState } from '../persistence/CitySave';
+import { AgoraPanel } from '../ui/AgoraPanel';
 import { BuildPanel, BUILD_LABELS } from '../ui/BuildPanel';
 import { EventPanel } from '../ui/EventPanel';
 import { AdvisorPanel } from '../ui/AdvisorPanel';
@@ -33,6 +34,7 @@ import { MetricsPanel } from '../ui/MetricsPanel';
 import { SimulationControls } from '../ui/SimulationControls';
 import { CameraControls } from '../ui/CameraControls';
 import { SaveLoadControls } from '../ui/SaveLoadControls';
+import { deriveAgoraSummary } from './AgoraSummary';
 import { getSimulationIntervalMs, type SimulationSpeed } from './SimulationSpeed';
 import { createSessionMetrics, recordSessionMetric, refreshSessionMetrics } from './SessionMetrics';
 import { TouchGestureRecognizer, type TouchGestureUpdate } from '../input/TouchGestureRecognizer';
@@ -63,6 +65,8 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   let lastPanPoint: { x: number; y: number } | undefined;
   const touchGesture = new TouchGestureRecognizer();
   const tracedTileKeys = new Set<string>();
+  const agora = new AgoraPanel(panelHost);
+  const buildHost = createCollapsiblePanelHost(panelHost, 'Construção', true);
   let advisor: AdvisorPanel | undefined;
   const textures = await loadMapTextures();
   const app = await createPixiApp(host);
@@ -70,8 +74,8 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   app.stage.addChild(map);
   let camera: CameraState = map.fitCamera(app.screen.width, app.screen.height);
   const panel = new BuildPanel(
-    panelHost,
-    () => resetActiveScenario('Scenario reset with the selected deterministic profile.'),
+    buildHost,
+    () => resetActiveScenario('Cenário reiniciado com o perfil determinístico selecionado.'),
     () => toggleOverlay('water'),
     () => toggleOverlay('food'),
     () => toggleOverlay('desirability'),
@@ -81,13 +85,13 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     },
   );
   const cameraControls = new CameraControls(
-    panelHost,
+    createCollapsiblePanelHost(panelHost, 'Navegação do mapa'),
     () => zoomAt({ x: app.screen.width / 2, y: app.screen.height / 2 }, ZOOM_STEP),
     () => zoomAt({ x: app.screen.width / 2, y: app.screen.height / 2 }, 1 / ZOOM_STEP),
     centerCamera,
   );
   const simulationControls = new SimulationControls(
-    panelHost,
+    createCollapsiblePanelHost(panelHost, 'Simulação'),
     () => {
       if (isScenarioTerminal()) {
         paused = true;
@@ -103,9 +107,9 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     },
   );
   simulationControls.update(paused, speed);
-  const scenarioPanel = new ScenarioPanel(panelHost, activeScenario);
-  const metricsPanel = new MetricsPanel(panelHost);
-  const eventPanel = new EventPanel(panelHost, () => city, () => {
+  const scenarioPanel = new ScenarioPanel(createCollapsiblePanelHost(panelHost, 'Cenário'), activeScenario);
+  const metricsPanel = new MetricsPanel(createCollapsiblePanelHost(panelHost, 'Métricas'));
+  const eventPanel = new EventPanel(createCollapsiblePanelHost(panelHost, 'Eventos'), () => city, () => {
     const fulfilled = fulfillImperialRequest(city);
     if (fulfilled) {
       metrics = recordSessionMetric(metrics, 'imperialRequestsFulfilled');
@@ -113,7 +117,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     }
     return fulfilled;
   });
-  advisor = new AdvisorPanel(panelHost, () => city, {
+  advisor = new AdvisorPanel(createCollapsiblePanelHost(panelHost, 'Conselheiro'), () => city, {
     getScenarioContext: () => getScenarioContext(evaluateScenario(city, activeScenario)),
     getScenarioProgress: () => evaluateScenario(city, activeScenario),
     isApprovalBlocked: isScenarioTerminal,
@@ -130,7 +134,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     },
     onRejectPlan: () => { metrics = recordSessionMetric(metrics, 'advisorPlansRejected'); },
   });
-  const selector = new ScenarioSelector(panelHost, { scenarioId: selectedScenarioId, difficulty: selectedDifficulty }, ({ scenarioId, difficulty }) => {
+  const selector = new ScenarioSelector(createCollapsiblePanelHost(panelHost, 'Configuração do cenário'), { scenarioId: selectedScenarioId, difficulty: selectedDifficulty }, ({ scenarioId, difficulty }) => {
     selectedScenarioId = scenarioId;
     selectedDifficulty = difficulty;
     activeScenario = resolveScenario(getScenario(selectedScenarioId), selectedDifficulty);
@@ -138,7 +142,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   });
 
   const saveLoadControls = new SaveLoadControls(
-    panelHost,
+    createCollapsiblePanelHost(panelHost, 'Guardar e carregar'),
     () => saveCityState(city),
     () => {
       const result = loadCityState();
@@ -219,6 +223,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       simulationControls.update(paused, speed);
     }
     scenarioPanel.update(scenarioProgress);
+    agora.update(deriveAgoraSummary(city, scenarioProgress));
     metricsPanel.update(metrics);
     eventPanel.update(city);
     advisor?.updateScenarioContext();
@@ -475,6 +480,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     app.canvas.removeEventListener('wheel', handleWheel);
     window.removeEventListener('keydown', handleKeyDown);
     window.removeEventListener('keyup', handleKeyUp);
+    agora.destroy();
     panel.destroy();
     cameraControls.destroy();
     simulationControls.destroy();
@@ -484,6 +490,21 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     advisor?.destroy();
     selector.destroy();
     saveLoadControls.destroy();
+    for (const wrapper of panelHost.querySelectorAll?.('.secondary-panel') ?? []) wrapper.remove();
     app.destroy(true, { children: true });
   };
+}
+
+function createCollapsiblePanelHost(host: HTMLElement, title: string, open = false): HTMLElement {
+  if (typeof document === 'undefined') return host;
+  const details = document.createElement('details');
+  details.className = 'secondary-panel';
+  details.open = open;
+  const summary = document.createElement('summary');
+  summary.textContent = title;
+  const content = document.createElement('div');
+  content.className = 'secondary-panel-content';
+  details.append(summary, content);
+  host.append(details);
+  return content;
 }

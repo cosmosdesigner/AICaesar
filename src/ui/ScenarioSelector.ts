@@ -21,9 +21,9 @@ export class ScenarioSelector {
     this.element.setAttribute('aria-label', 'Scenario selection');
 
     const title = document.createElement('h2');
-    title.textContent = 'Scenario setup';
+    title.textContent = 'Configuração do cenário';
     const scenarioLabel = document.createElement('label');
-    scenarioLabel.textContent = 'Scenario';
+    scenarioLabel.textContent = 'Cenário';
     this.scenario.setAttribute('aria-label', 'Scenario');
     for (const definition of SCENARIO_CATALOG) {
       const option = document.createElement('option');
@@ -34,7 +34,7 @@ export class ScenarioSelector {
     }
 
     const difficultyLabel = document.createElement('label');
-    difficultyLabel.textContent = 'Difficulty';
+    difficultyLabel.textContent = 'Dificuldade';
     this.difficulty.setAttribute('aria-label', 'Difficulty');
     for (const profile of DIFFICULTY_PROFILES) {
       const option = document.createElement('option');
@@ -45,8 +45,8 @@ export class ScenarioSelector {
     }
 
     this.start.type = 'button';
-    this.start.textContent = 'Start selected scenario';
-    this.start.title = 'Start a fresh deterministic city using the selected scenario and difficulty.';
+    this.start.textContent = 'Iniciar cenário seleccionado';
+    this.start.title = 'Iniciar uma cidade determinística nova com o cenário e dificuldade seleccionados.';
     this.start.addEventListener('click', this.handleStart);
     this.element.append(title, scenarioLabel, this.scenario, difficultyLabel, this.difficulty, this.start);
     host.append(this.element);

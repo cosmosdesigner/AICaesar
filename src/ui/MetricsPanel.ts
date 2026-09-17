@@ -8,7 +8,7 @@ export class MetricsPanel {
     this.element.className = 'metrics-panel';
     this.element.setAttribute('aria-label', 'Session metrics');
     const title = document.createElement('h2');
-    title.textContent = 'Session metrics';
+    title.textContent = 'Métricas da sessão';
     this.element.append(title, this.details);
     host.append(this.element);
   }

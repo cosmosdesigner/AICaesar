@@ -17,13 +17,13 @@ export class SimulationControls {
     this.element.setAttribute('aria-label', 'Simulation controls');
 
     const title = document.createElement('h2');
-    title.textContent = 'Simulation';
+    title.textContent = 'Simulação';
 
     const status = document.createElement('p');
     status.append('Status: ', this.state);
 
     this.toggle.type = 'button';
-    this.toggle.title = 'Pause or resume simulation ticks';
+    this.toggle.title = 'Pausar ou retomar os ticks da simulação';
     this.toggle.addEventListener('click', () => {
       const paused = this.onTogglePause();
       this.setPaused(paused);
@@ -62,8 +62,8 @@ export class SimulationControls {
   }
 
   private setPaused(paused: boolean): void {
-    this.state.textContent = paused ? 'Paused' : 'Running';
-    this.toggle.textContent = paused ? 'Play' : 'Pause';
+    this.state.textContent = paused ? 'Pausada' : 'Em curso';
+    this.toggle.textContent = paused ? 'Retomar' : 'Pausar';
     this.toggle.setAttribute('aria-pressed', String(paused));
   }
 

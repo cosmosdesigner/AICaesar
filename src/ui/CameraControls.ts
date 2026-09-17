@@ -11,7 +11,7 @@ export class CameraControls {
     this.element.setAttribute('aria-label', 'Map navigation');
 
     const title = document.createElement('h2');
-    title.textContent = 'Map navigation';
+    title.textContent = 'Navegação do mapa';
 
     const controls = document.createElement('div');
     controls.className = 'camera-control-buttons';
@@ -24,9 +24,9 @@ export class CameraControls {
     );
 
     const panHelp = document.createElement('p');
-    panHelp.textContent = 'Pan: middle-drag or Space + left-drag';
+    panHelp.textContent = 'Mover: arrastar com botão do meio ou Espaço + botão esquerdo';
     const zoomHelp = document.createElement('p');
-    zoomHelp.textContent = 'Zoom: mouse wheel or controls';
+    zoomHelp.textContent = 'Zoom: roda do rato ou controlos';
 
     this.element.append(title, controls, panHelp, zoomHelp);
     host.append(this.element);

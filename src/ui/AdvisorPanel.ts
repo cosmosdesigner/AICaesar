@@ -59,33 +59,33 @@ export class AdvisorPanel {
     this.element.setAttribute('aria-label', 'Advisor');
 
     const title = document.createElement('h2');
-    title.textContent = 'Advisor';
+    title.textContent = 'Conselheiro';
 
     const analyze = document.createElement('button');
     analyze.type = 'button';
-    analyze.textContent = 'Analyze city';
-    analyze.title = 'Analyze city issues and request a local advisor plan.';
+    analyze.textContent = 'Analisar cidade';
+    analyze.title = 'Analisar problemas da cidade e pedir um plano ao conselheiro local.';
     analyze.addEventListener('click', () => {
       void this.analyzeCity();
     });
 
     this.approve.type = 'button';
-    this.approve.textContent = 'Approve';
-    this.approve.title = 'Approve and execute the current validated advisor plan.';
+    this.approve.textContent = 'Aprovar';
+    this.approve.title = 'Aprovar e executar o plano validado do conselheiro.';
     this.approve.addEventListener('click', () => {
       if (this.plan === undefined) {
-        this.status.textContent = 'No advisor plan to approve.';
+        this.status.textContent = 'Não há plano do conselheiro para aprovar.';
         return;
       }
       if (this.options.isApprovalBlocked?.() === true) {
-        this.status.textContent = 'Advisor plan approval is blocked because the scenario has ended.';
+        this.status.textContent = 'A aprovação está bloqueada porque o cenário terminou.';
         this.updateScenarioContext();
         return;
       }
 
       const result = this.options.onApprovePlan?.(this.plan);
       if (result === undefined) {
-        this.status.textContent = 'No advisor executor configured.';
+        this.status.textContent = 'Não existe executor do conselheiro configurado.';
         return;
       }
 
@@ -100,15 +100,15 @@ export class AdvisorPanel {
 
     const reject = document.createElement('button');
     reject.type = 'button';
-    reject.textContent = 'Reject';
-    reject.title = 'Reject the current advisor plan without changing the city.';
+    reject.textContent = 'Rejeitar';
+    reject.title = 'Rejeitar o plano actual sem alterar a cidade.';
     reject.addEventListener('click', () => {
       if (this.plan !== undefined) this.options.onRejectPlan?.();
       this.plan = undefined;
       this.report = undefined;
       this.renderPlan();
       this.providerUsed = undefined;
-      this.status.textContent = 'Plan rejected.';
+      this.status.textContent = 'Plano rejeitado.';
     });
 
     this.summary.className = 'advisor-summary';
@@ -117,10 +117,10 @@ export class AdvisorPanel {
     this.status.className = 'advisor-status';
     this.status.setAttribute('role', 'status');
     this.scenarioContext.className = 'advisor-scenario-context';
-    this.status.textContent = 'No advisor plan generated yet.';
+    this.status.textContent = 'Ainda não foi gerado nenhum plano.';
 
     const reportTitle = document.createElement('h3');
-    reportTitle.textContent = 'After-action report';
+    reportTitle.textContent = 'Relatório da acção';
     this.reportSection.className = 'after-action-report';
     this.reportIssuesLabel.className = 'after-action-issues-label';
     this.reportSection.append(
@@ -184,7 +184,7 @@ export class AdvisorPanel {
     this.providerUsed = undefined;
     this.report = undefined;
     this.renderPlan();
-    this.status.textContent = 'Analyzing...';
+    this.status.textContent = 'A analisar...';
 
     const city = this.getCity();
     const scenario = this.options.getScenarioProgress?.();

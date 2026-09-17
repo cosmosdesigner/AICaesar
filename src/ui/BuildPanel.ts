@@ -8,29 +8,29 @@ import type { BuildingType } from '../simulation/Tile';
 export type BuildTool = BuildingType | 'bulldoze';
 
 export const BUILD_LABELS: Readonly<Record<BuildTool, string>> = {
-  road: 'Road',
-  house: 'House',
-  well: 'Well',
-  farm: 'Farm',
-  granary: 'Granary',
-  market: 'Market',
-  garden: 'Garden',
-  plaza: 'Plaza',
-  fountain: 'Fountain',
-  bulldoze: 'Bulldoze',
+  road: 'Estrada',
+  house: 'Casa',
+  well: 'Poço',
+  farm: 'Quinta',
+  granary: 'Celeiro',
+  market: 'Mercado',
+  garden: 'Jardim',
+  plaza: 'Praça',
+  fountain: 'Fonte',
+  bulldoze: 'Demolir',
 };
 
 const BUILD_TITLES: Readonly<Record<BuildTool, string>> = {
-  road: 'Roads connect buildings to the main road network. Isolated roads do not activate buildings.',
-  house: 'Houses begin empty and attract residents with main road access, water and food reached along roads.',
-  well: 'Wells connected to the main network provide water within 3 road steps. Isolated wells do not work.',
-  farm: 'Farms produce food only with main road access and enough workers.',
-  granary: 'Granaries store food only with main road access and enough workers; they supply markets within 8 road steps.',
-  market: 'Markets need main road access and workers; stocked markets serve houses within 4 road steps.',
-  garden: 'Garden improves nearby urban desirability within 2 tiles.',
-  plaza: 'Plaza improves nearby urban desirability within 3 tiles.',
-  fountain: 'Fountain improves nearby urban desirability within 3 tiles.',
-  bulldoze: 'Remove one building or road without a refund.',
+  road: 'As estradas ligam edifícios à rede principal. Estradas isoladas não ativam edifícios.',
+  house: 'As casas atraem habitantes com ligação à estrada principal, água e comida pela rede.',
+  well: 'Poços ligados à rede principal fornecem água num raio de 3 passos de estrada.',
+  farm: 'As quintas produzem comida com ligação à rede principal e trabalhadores suficientes.',
+  granary: 'Os celeiros armazenam comida com ligação à rede principal e trabalhadores suficientes.',
+  market: 'Os mercados ativos abastecem casas próximas pela rede de estradas.',
+  garden: 'O jardim melhora a atratividade urbana nas redondezas.',
+  plaza: 'A praça melhora a atratividade urbana nas redondezas.',
+  fountain: 'A fonte melhora a atratividade urbana nas redondezas.',
+  bulldoze: 'Remove um edifício ou estrada sem reembolso.',
 };
 
 const BUILD_TOOLS: readonly BuildTool[] = [
@@ -150,114 +150,114 @@ export class BuildPanel {
     const stats = document.createElement('div');
     stats.className = 'build-stats';
     stats.append(
-      this.createStat('Road network', this.mainRoadTiles),
-      this.createStat('Connected buildings', this.connectedBuildings),
-      this.createStat('Isolated buildings', this.isolatedBuildings),
+      this.createStat('Rede principal', this.mainRoadTiles),
+      this.createStat('Edifícios ligados', this.connectedBuildings),
+      this.createStat('Edifícios isolados', this.isolatedBuildings),
       this.createStat('Casas', this.housesTotal),
-      this.createStat('Com rede principal', this.housesRoad),
+      this.createStat('Na rede principal', this.housesRoad),
       this.createStat('Com água', this.housesWater),
       this.createStat('Com comida', this.housesFood),
       this.createStat('Nível 2', this.housesLevelTwo),
       this.createStat('Nível 3', this.housesLevelThree),
       this.createStat('Tiles com água', this.waterTiles),
       this.createStat('Comida total', this.foodStored),
-      this.createStat('Granary stock', this.granaryStock),
-      this.createStat('Market stock', this.marketStock),
-      this.createStat('Market demand', this.marketDemand),
-      this.createStat('Supplied markets', this.suppliedMarkets),
-      this.createStat('Farms', this.farms),
-      this.createStat('Granaries', this.granaries),
-      this.createStat('Markets', this.markets),
+      this.createStat('Stock do celeiro', this.granaryStock),
+      this.createStat('Stock do mercado', this.marketStock),
+      this.createStat('Procura do mercado', this.marketDemand),
+      this.createStat('Mercados abastecidos', this.suppliedMarkets),
+      this.createStat('Quintas', this.farms),
+      this.createStat('Celeiros', this.granaries),
+      this.createStat('Mercados', this.markets),
       this.createStat('Tiles com comida', this.foodTiles),
-      this.createStat('Avg desirability', this.averageDesirability),
-      this.createStat('Low desirability houses', this.lowDesirabilityHouses),
-      this.createStat('Good desirability houses', this.goodDesirabilityHouses),
+      this.createStat('Atratividade média', this.averageDesirability),
+      this.createStat('Casas com baixa atratividade', this.lowDesirabilityHouses),
+      this.createStat('Casas com boa atratividade', this.goodDesirabilityHouses),
       this.createStat('População', this.population),
-      this.createStat('Available housing', this.availableHousing),
-      this.createStat('Growth last tick', this.populationLastChange),
+      this.createStat('Habitação disponível', this.availableHousing),
+      this.createStat('Variação no último tick', this.populationLastChange),
       this.createStat('Trabalhadores disponíveis', this.workersAvailable),
       this.createStat('Trabalhadores necessários', this.workersRequired),
       this.createStat('Trabalhadores atribuídos', this.workersAssigned),
       this.createStat('Desempregados', this.unemployedWorkers),
       this.createStat('Falta de trabalhadores', this.workerShortage),
-      this.createStat('Workplaces ativos', this.activeWorkplaces),
-      this.createStat('Workplaces inativos', this.inactiveWorkplaces),
+      this.createStat('Locais de trabalho ativos', this.activeWorkplaces),
+      this.createStat('Locais de trabalho inativos', this.inactiveWorkplaces),
     );
 
     const housingRequirements = document.createElement('div');
     housingRequirements.className = 'housing-requirements';
     const housingRequirementsTitle = document.createElement('h2');
-    housingRequirementsTitle.textContent = 'Housing requirements';
+    housingRequirementsTitle.textContent = 'Requisitos das casas';
     housingRequirements.append(
       housingRequirementsTitle,
-      this.createStat('Blocked by road', this.blockedByRoad),
-      this.createStat('Blocked by water', this.blockedByWater),
-      this.createStat('Blocked by food', this.blockedByFood),
-      this.createStat('Degrading', this.degradingHouses),
+      this.createStat('Bloqueadas por estrada', this.blockedByRoad),
+      this.createStat('Bloqueadas por água', this.blockedByWater),
+      this.createStat('Bloqueadas por comida', this.blockedByFood),
+      this.createStat('Em degradação', this.degradingHouses),
     );
 
     const finance = document.createElement('div');
     finance.className = 'finance-stats';
-    finance.title = 'Taxes from houses minus upkeep for wells, farms, granaries and markets every 10 ticks.';
+    finance.title = 'Impostos das casas menos manutenção de poços, quintas, celeiros e mercados a cada 10 ticks.';
     const financeTitle = document.createElement('h2');
-    financeTitle.textContent = 'Finance';
+    financeTitle.textContent = 'Finanças';
     finance.append(
       financeTitle,
-      this.createStat('Period', this.financePeriod),
-      this.createStat('Taxes', this.financeTaxes),
-      this.createStat('Upkeep', this.financeUpkeep),
-      this.createStat('Net', this.financeNet),
-      this.createStat('Treasury', this.financeTreasury),
-      this.createStat('Next balance', this.financeNext),
+      this.createStat('Período', this.financePeriod),
+      this.createStat('Impostos', this.financeTaxes),
+      this.createStat('Manutenção', this.financeUpkeep),
+      this.createStat('Saldo', this.financeNet),
+      this.createStat('Tesouro', this.financeTreasury),
+      this.createStat('Próximo balanço', this.financeNext),
     );
 
 
     this.waterOverlay.type = 'button';
-    this.waterOverlay.textContent = 'Show water coverage: Off';
-    this.waterOverlay.title = 'Show roads reached within 3 road steps of connected wells and existing buildings adjacent to those roads.';
+    this.waterOverlay.textContent = 'Mostrar cobertura de água: não';
+    this.waterOverlay.title = 'Mostra estradas alcançadas por poços ligados e edifícios adjacentes.';
     this.waterOverlay.setAttribute('aria-pressed', 'false');
     this.waterOverlay.addEventListener('click', () => {
       const enabled = onWaterOverlayToggle();
       this.setWaterOverlay(enabled);
       this.status.textContent = enabled
-        ? 'Water coverage shows reached main roads and existing buildings beside them; proximity alone is not enough.'
-        : 'Water coverage overlay hidden.';
+        ? 'A cobertura de água mostra estradas principais alcançadas e edifícios adjacentes.'
+        : 'Cobertura de água ocultada.';
     });
 
     this.foodOverlay.type = 'button';
-    this.foodOverlay.textContent = 'Show food coverage: Off';
-    this.foodOverlay.title = 'Show roads reached within 4 road steps of active stocked markets and existing buildings adjacent to those roads.';
+    this.foodOverlay.textContent = 'Mostrar cobertura de comida: não';
+    this.foodOverlay.title = 'Mostra o alcance dos mercados ativos com stock.';
     this.foodOverlay.setAttribute('aria-pressed', 'false');
     this.foodOverlay.addEventListener('click', () => {
       const enabled = onFoodOverlayToggle();
       this.setFoodOverlay(enabled);
       this.status.textContent = enabled
-        ? 'Food coverage shows road reach from active stocked markets and hungry houses; proximity alone is not enough.'
-        : 'Food coverage overlay hidden.';
+        ? 'A cobertura de comida mostra o alcance dos mercados ativos.'
+        : 'Cobertura de comida ocultada.';
     });
 
     this.desirabilityOverlay.type = 'button';
-    this.desirabilityOverlay.textContent = 'Show desirability: Off';
-    this.desirabilityOverlay.title = 'Show local urban quality: green is good, orange is medium and red is low.';
+    this.desirabilityOverlay.textContent = 'Mostrar atratividade: não';
+    this.desirabilityOverlay.title = 'Mostra a qualidade urbana local: verde é boa, laranja média e vermelho baixa.';
     this.desirabilityOverlay.setAttribute('aria-pressed', 'false');
     this.desirabilityOverlay.addEventListener('click', () => {
       const enabled = onDesirabilityOverlayToggle();
       this.setDesirabilityOverlay(enabled);
       this.status.textContent = enabled
-        ? 'Desirability: green = good, orange = medium, red = low.'
-        : 'Desirability overlay hidden.';
+        ? 'Atratividade: verde = boa, laranja = média, vermelho = baixa.'
+        : 'Atratividade ocultada.';
     });
 
     this.roadNetworkOverlay.type = 'button';
-    this.roadNetworkOverlay.textContent = 'Show road network: Off';
-    this.roadNetworkOverlay.title = 'Green roads belong to the main network; orange roads are isolated. Isolated farms, granaries, markets and wells do not work.';
+    this.roadNetworkOverlay.textContent = 'Mostrar rede de estradas: não';
+    this.roadNetworkOverlay.title = 'Estradas verdes pertencem à rede principal; as laranja estão isoladas.';
     this.roadNetworkOverlay.setAttribute('aria-pressed', 'false');
     this.roadNetworkOverlay.addEventListener('click', () => {
       const enabled = onRoadNetworkOverlayToggle();
       this.setRoadNetworkOverlay(enabled);
       this.status.textContent = enabled
-        ? 'Road network: green = main, orange = isolated. Buildings must touch the main network to function.'
-        : 'Road network overlay hidden.';
+        ? 'Rede de estradas: verde = principal, laranja = isolada.'
+        : 'Rede de estradas ocultada.';
     });
 
     this.issues.className = 'city-issues';
@@ -265,8 +265,8 @@ export class BuildPanel {
 
     const reset = document.createElement('button');
     reset.type = 'button';
-    reset.textContent = 'Reset';
-    reset.title = 'Reset city money, buildings and simulation tick.';
+    reset.textContent = 'Reiniciar';
+    reset.title = 'Reinicia dinheiro, edifícios e tick da simulação.';
     reset.addEventListener('click', onReset);
     this.status.className = 'build-status';
     this.status.setAttribute('role', 'status');
@@ -390,22 +390,22 @@ export class BuildPanel {
   }
 
   private setWaterOverlay(enabled: boolean): void {
-    this.waterOverlay.textContent = `Show water coverage: ${enabled ? 'On' : 'Off'}`;
+    this.waterOverlay.textContent = `Mostrar cobertura de água: ${enabled ? 'sim' : 'não'}`;
     this.waterOverlay.setAttribute('aria-pressed', String(enabled));
   }
 
   private setFoodOverlay(enabled: boolean): void {
-    this.foodOverlay.textContent = `Show food coverage: ${enabled ? 'On' : 'Off'}`;
+    this.foodOverlay.textContent = `Mostrar cobertura de comida: ${enabled ? 'sim' : 'não'}`;
     this.foodOverlay.setAttribute('aria-pressed', String(enabled));
   }
 
   private setDesirabilityOverlay(enabled: boolean): void {
-    this.desirabilityOverlay.textContent = `Show desirability: ${enabled ? 'On' : 'Off'}`;
+    this.desirabilityOverlay.textContent = `Mostrar atratividade: ${enabled ? 'sim' : 'não'}`;
     this.desirabilityOverlay.setAttribute('aria-pressed', String(enabled));
   }
 
   private setRoadNetworkOverlay(enabled: boolean): void {
-    this.roadNetworkOverlay.textContent = `Show road network: ${enabled ? 'On' : 'Off'}`;
+    this.roadNetworkOverlay.textContent = `Mostrar rede de estradas: ${enabled ? 'sim' : 'não'}`;
     this.roadNetworkOverlay.setAttribute('aria-pressed', String(enabled));
   }
 }
