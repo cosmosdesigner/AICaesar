@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 21 — eventos e pressão de jogo**: mapa isométrico 30×30, construção manual de roads/houses/wells/farms/granaries/markets e amenities garden/plaza/fountain, rede principal e serviços por distância BFS em estradas, desirability local determinística, população, workers, finanças, eventos temporários determinísticos, pedidos do imperador, cenário, advisor mock local, execução transaccional validada de planos aprovados e overlays de água/comida/rede viária/desirability.
+**Fase 22 — save/load local**: mapa isométrico 30×30, construção manual de roads/houses/wells/farms/granaries/markets e amenities garden/plaza/fountain, rede principal e serviços por distância BFS em estradas, desirability local determinística, população, workers, finanças, eventos temporários determinísticos, pedidos do imperador, cenário, advisor mock local, execução transaccional validada de planos aprovados, overlays de água/comida/rede viária/desirability e save/load local versionado.
 
 ## Executar localmente
 
@@ -19,7 +19,7 @@ npm test
 npm run preview
 ```
 
-`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa as regressões Vitest do seed inicial, cenário, câmara, renderer, rede viária/BFS, analyzer, advisor, ações, evolução/degradação de casas, desirability, logística de comida, população e economia financeira. `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui assets temporários e não deve ser publicado.** Browser/manual UI testing está fora do escopo da Fase 20; renderer e integração do jogo usam regressões automatizadas headless.
+`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa as regressões Vitest do seed inicial, cenário, câmara, renderer, rede viária/BFS, analyzer, advisor, ações, evolução/degradação de casas, desirability, logística de comida, população, economia financeira e persistência local. `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui assets temporários e não deve ser publicado.** Browser/manual UI testing está fora do escopo da Fase 22; renderer e integração do jogo usam regressões automatizadas headless.
 
 ## O que aparece
 
@@ -40,7 +40,7 @@ npm run preview
 - O painel **Finance** mostra período, impostos, upkeep, net, treasury e ticks até ao próximo balanço.
 - O painel mostra **Avg desirability**, **Low desirability houses** e **Good desirability houses**, todos derivados do estado atual.
 - O painel mostra **Road network** (tiles da componente principal), **Connected buildings** (ligados/total, excluindo roads) e **Isolated buildings**. Os valores são derivados da cidade atual e não dependem da ordem de inserção.
-- Botões principais têm `title` simples para explicar construção, overlays, análise, aprovação, rejeição, reset, pausa/play e velocidade.
+- Botões principais têm `title` simples para explicar construção, overlays, análise, aprovação, rejeição, save/load, reset, pausa/play e velocidade.
 - O analyzer determinístico resume tick, dinheiro, casas, água, comida e emprego, e gera issues ordenadas por severidade, tipo estável e número de tiles afetados. A issue `low_desirability` informa casas com score baixo, proximidade excessiva a farms/granaries/markets e ausência de amenities.
 - O painel mostra os 3 principais problemas detetados, incluindo baixa desirability, falta de água/comida, falta de produção/distribuição de comida, falta de trabalhadores, edifícios económicos sem estrada e dinheiro baixo; sem issues, mostra que não há problemas críticos.
 - O painel Advisor tem botão **Analyze city**; gera um `AdvisorPlan` de forma assíncrona via `AdvisorProvider`, mostra contexto determinístico do cenário sem enviar trabalho extra ao provider, mostra o provider usado (`mock` por defeito local, ou fallback quando configurado) e apresenta resumo, raciocínio, ações, custo estimado, impactos esperados e riscos. **Approve** valida orçamento aprovado, dinheiro, tipo, target, limites do mapa, ocupação e custo antes de executar builds via `placeBuilding`; quando a execução é bem-sucedida, mostra um after-action report com ações executadas, gasto, deltas de métricas reais e até 3 problemas remanescentes. **wait** é no-op válido; **Reject** limpa o plano. Com vitória/derrota, aprovação fica bloqueada até **Reset**.
@@ -59,7 +59,21 @@ A simulação usa apenas o relógio de ticks e um calendário com seed fixa (`21
 - Um **fire** publica warning no tick 84 e, nos ticks 90–97, suprime temporariamente o primeiro workplace por posição. Não destrói o edifício nem o inventário; a actividade é restaurada ao terminar.
 - O painel **Events** mostra warnings, eventos activos, prazo/stock do pedido e as mensagens recentes. O analyzer e o advisor mock incluem a pressão actual, mas o advisor não recebe novas actions.
 
-Estes eventos são pressão moderada de protótipo; não existem ainda combate, safety/prefecture, walkers, múltiplos goods, comércio externo ou save/load.
+Estes eventos são pressão moderada de protótipo; não existem ainda combate, safety/prefecture, walkers, múltiplos goods ou comércio externo.
+
+## Save/load local
+
+Os botões **Save** e **Load** guardam ou restauram a cidade atual no mesmo browser, numa única chave `localStorage` namespaced (`aicaesar.save.v1`). O payload JSON inclui `schemaVersion: 1`, mapa, edifícios, recursos, simulação, stocks, população, finanças e estado de eventos; não inclui renderer, câmara, DOM ou configuração da sessão.
+
+O Load valida o envelope e todos os dados antes de hidratar uma cópia independente, recalcula o estado derivado sem avançar ticks e mantém a cidade ativa se o save estiver ausente, incompatível, corrompido ou se o storage falhar. **Reset** não apaga o save local. Não há backend, cloud saves, slots, autosave nem import/export de ficheiros.
+
+Verificar esta fase sem browser manual:
+
+```sh
+npm test -- --run
+npm run build
+git diff --check
+```
 
 ## Demo rápido de 5 minutos
 
@@ -83,7 +97,7 @@ Estes eventos são pressão moderada de protótipo; não existem ainda combate, 
 - Tiles ocupados, coordenadas fora do mapa, dinheiro insuficiente e cenário terminado são rejeitados sem alterar cidade, saldo ou comida armazenada. O balanço financeiro pode tornar o saldo negativo; `placeBuilding` continua a validar o saldo disponível antes de construir.
 - **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `simulation.tick`, `simulation.finance`, edifícios iniciais com `storedFood: 0`, casas seedadas cheias no nível 1, `simulation.population.lastChange: 0`, estado ativo/inativo recalculado e cenário **Active**; scores, stats e overlay de desirability são recalculados, nunca restaurados de estado derivado. Mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
 
-O mapa completo é redesenhado após construção válida, execução válida do advisor, reset, tick de simulação ou toggle de overlay; redimensionamento preserva o mapa e reaplica a câmara. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Pan usa botão do meio ou **Space** + drag esquerdo sem construir ao soltar; zoom usa roda do rato ou botões e respeita limites. Não há rotação, demolição, cidadãos individuais, walkers/pathfinding de unidades, commute, salários, tax collectors, nascimento/morte, classes sociais, mini-map, inércia de câmara, múltiplos tipos de comida, backend, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial de plano, save/load, eventos, crime, fogo, doença ou safety/prefecture.
+O mapa completo é redesenhado após construção válida, execução válida do advisor, save/load, reset, tick de simulação ou toggle de overlay; redimensionamento preserva o mapa e reaplica a câmara. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Pan usa botão do meio ou **Space** + drag esquerdo sem construir ao soltar; zoom usa roda do rato ou botões e respeita limites. Continuam fora do escopo rotação, demolição, cidadãos individuais, walkers/pathfinding de unidades, commute, salários, tax collectors, nascimento/morte, classes sociais, mini-map, inércia de câmara, múltiplos tipos de comida, backend, contas, sincronização/cloud saves, slots, autosave, import/export, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial de plano, combate, crime, multiplayer ou editor de mapas.
 
 Verificação manual: construir Road num tile vazio (saldo 496), selecionar House e clicar no mesmo tile (erro, saldo 496), construir Farm, Granary e Market em tiles vazios. Construir uma House aumenta capacidade/vagas, mas não residentes ou workers imediatamente. Com poucas casas ocupadas e workplaces demais, alguns workplaces ficam inativos; farms inativas não produzem, granaries inativas não recebem/fornecem stock e markets inativos ou vazios não dão cobertura de comida, mas todos continuam a pagar upkeep a cada 10 ticks. Inventários de edifícios inativos são preservados até voltarem a poder ser usados. Reset deve restaurar saldo 500, stocks 0, tick 0, período financeiro 0, 32 residentes em 32 lugares, saldo populacional 0 e a cidade seedada.
 
@@ -123,7 +137,8 @@ src/
   actions/ActionValidator.ts Validator puro de AdvisorPlan sem mutar a cidade
   actions/ActionExecutor.ts  Executor transacional simples: valida, constrói e recalcula trabalhadores
   assets/AssetManifest.ts    URLs locais, carregamento das sete texturas de origem e aliases temporários para amenities
-  game/Game.ts              Input PixiJS, construção, reset, loop pausável, avaliação de cenário, resize e libertação
+  game/Game.ts              Input PixiJS, construção, save/load local, reset, loop pausável, avaliação de cenário, resize e libertação
+  persistence/CitySave.ts   Serialização, validação fail-closed, hydration e storage local versionado
   game/SimulationSpeed.ts   Mapeamento 1x/2x/4x para intervalos de tick
   rendering/PixiApp.ts       Canvas PixiJS
   rendering/Camera.ts        Estado e matemática pura da câmara: clamp de zoom, zoom ancorado, pan e fitting
@@ -141,6 +156,7 @@ src/
   ui/ScenarioPanel.ts        Painel HTML do cenário: briefing, objetivos, progresso, ticks e resultado
   ui/ObjectivesPanel.ts      Painel estático legado com objetivos do fluxo MVP
   ui/AdvisorPanel.ts         Painel HTML do advisor: contexto do cenário, Analyze city, plano, Approve bloqueável, after-action report e Reject
+  ui/SaveLoadControls.ts    Painel HTML de Save/Load com feedback de storage
   main.ts                   Arranque e mensagem de erro de carregamento
   style.css                 Layout da página
 public/assets/prototype/    Apenas sete PNGs e aviso de licenciamento
@@ -179,5 +195,6 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 - [Plano da Fase 19](documentation/phase-19-development-plan.md)
 - [Plano da Fase 20](documentation/phase-20-development-plan.md)
 - [Plano da Fase 21](documentation/phase-21-development-plan.md)
+- [Plano da Fase 22](documentation/phase-22-development-plan.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)

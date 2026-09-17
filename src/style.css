@@ -20,7 +20,8 @@ main { padding: 0 16px; }
 .simulation-controls,
 .camera-controls,
 .objectives-panel,
-.scenario-panel {
+.scenario-panel,
+.save-load-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -43,6 +44,7 @@ main { padding: 0 16px; }
 .camera-controls h2,
 .objectives-panel h2,
 .scenario-panel h2,
+.save-load-controls h2,
 .finance-stats h2 {
   margin: 0;
   font-size: 16px;
@@ -156,7 +158,8 @@ button {
 button:hover { background: #365440; }
 button[aria-pressed="true"] { color: #182522; background: #d6c18b; border-color: #d6c18b; }
 button:focus-visible { outline: 2px solid #f2d690; outline-offset: 3px; }
-.build-status { flex-basis: 100%; min-height: 1.5em; color: #d6c18b; }
+.build-status,
+.save-load-status { flex-basis: 100%; min-height: 1.5em; color: #d6c18b; }
 #map {
   position: relative;
   width: 100%;

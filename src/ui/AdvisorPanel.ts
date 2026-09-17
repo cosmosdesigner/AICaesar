@@ -143,6 +143,15 @@ export class AdvisorPanel {
     this.approve.disabled = this.options.isApprovalBlocked?.() === true;
   }
 
+  invalidateForCityLoad(): void {
+    this.analysisRequest += 1;
+    this.plan = undefined;
+    this.report = undefined;
+    this.providerUsed = undefined;
+    this.renderPlan();
+    this.status.textContent = 'Advisor plan cleared after loading a different city.';
+  }
+
   private async analyzeCity(): Promise<void> {
     const request = this.analysisRequest + 1;
     this.analysisRequest = request;

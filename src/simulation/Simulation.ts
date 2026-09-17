@@ -255,6 +255,18 @@ export function assignWorkers(city: CityState, network = getRoadNetwork(city)): 
   }
 }
 
+export function recalculateDerivedState(city: CityState): void {
+  const network = getRoadNetwork(city);
+  assignWorkers(city, network);
+  const waterCoverage = getWaterCoverage(city, network);
+  for (const house of city.buildings) {
+    if (house.type !== 'house') continue;
+    house.hasRoadAccess = hasAdjacentRoad(city, house, network);
+    house.hasWater = waterCoverage.has(getTileKey(house.x, house.y));
+    house.hasFood = getHouseFoodMarket(city, house, network) !== undefined;
+  }
+}
+
 export function getPopulation(city: CityState): number {
   return city.buildings.reduce((population, building) => {
     if (building.type !== 'house') return population;

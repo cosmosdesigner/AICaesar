@@ -13,12 +13,14 @@ import {
 import { createCityState, placeBuilding, type BuildResult } from '../simulation/CityState';
 import { assignWorkers, simulateTick } from '../simulation/Simulation';
 import { fulfillImperialRequest } from '../events/Events';
+import { loadCityState, saveCityState } from '../persistence/CitySave';
 import { BuildPanel, BUILD_LABELS } from '../ui/BuildPanel';
 import { EventPanel } from '../ui/EventPanel';
 import { AdvisorPanel } from '../ui/AdvisorPanel';
 import { ScenarioPanel } from '../ui/ScenarioPanel';
 import { SimulationControls } from '../ui/SimulationControls';
 import { CameraControls } from '../ui/CameraControls';
+import { SaveLoadControls } from '../ui/SaveLoadControls';
 import { getSimulationIntervalMs, type SimulationSpeed } from './SimulationSpeed';
 
 export async function startGame(host: HTMLElement, panelHost: HTMLElement): Promise<() => void> {
@@ -115,6 +117,20 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       return result;
     },
   });
+
+  const saveLoadControls = new SaveLoadControls(
+    panelHost,
+    () => saveCityState(city),
+    () => {
+      const result = loadCityState();
+      if (result.ok) {
+        city = result.city;
+        advisor.invalidateForCityLoad();
+        refreshCity(result.message);
+      }
+      return result;
+    },
+  );
 
   const messages: Record<Exclude<BuildResult, 'built'>, string> = {
     'outside-map': 'Construa dentro do mapa.',
@@ -291,6 +307,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     scenarioPanel.destroy();
     eventPanel.destroy();
     advisor.destroy();
+    saveLoadControls.destroy();
     app.destroy(true, { children: true });
   };
 }

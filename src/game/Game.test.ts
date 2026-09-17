@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CityState } from '../simulation/CityState';
+import { createCityState, type CityState } from '../simulation/CityState';
+import type { LoadResult, SaveResult } from '../persistence/CitySave';
 import { getPopulationStats } from '../simulation/Simulation';
 import { startGame } from './Game';
 
@@ -17,6 +18,11 @@ const doubles = vi.hoisted(() => ({
   eventPanelDestroy: vi.fn(),
   simulationControlsDestroy: vi.fn(),
   advisorDestroy: vi.fn(),
+  saveLoadControlsDestroy: vi.fn(),
+  persistenceSave: vi.fn<() => SaveResult>(() => ({ ok: true, message: 'City saved locally.' })),
+  persistenceLoad: vi.fn<() => LoadResult>(() => ({
+    ok: false, code: 'not_found', message: 'No local save was found.',
+  })),
   observe: vi.fn(),
   resizeObserverDisconnect: vi.fn(),
   setInterval: vi.fn((_callback: () => void) => 7),
@@ -45,6 +51,13 @@ const doubles = vi.hoisted(() => ({
     onZoomIn: () => void;
     onZoomOut: () => void;
     onCenterMap: () => void;
+  }>,
+  advisorInstances: [] as Array<{
+    invalidateForCityLoad: object;
+  }>,
+  saveLoadControlInstances: [] as Array<{
+    onSave: () => { readonly ok: boolean; readonly message: string };
+    onLoad: () => { readonly ok: boolean; readonly message: string };
   }>,
   resizeCallback: undefined as ResizeObserverCallback | undefined,
 }));
@@ -181,7 +194,31 @@ vi.mock('../ui/SimulationControls', () => ({
 vi.mock('../ui/AdvisorPanel', () => ({
   AdvisorPanel: class AdvisorPanel {
     updateScenarioContext = vi.fn();
+    invalidateForCityLoad = vi.fn();
     destroy = doubles.advisorDestroy;
+
+    constructor() {
+      doubles.advisorInstances.push(this);
+    }
+  },
+}));
+
+vi.mock('../persistence/CitySave', () => ({
+  saveCityState: doubles.persistenceSave,
+  loadCityState: doubles.persistenceLoad,
+}));
+
+vi.mock('../ui/SaveLoadControls', () => ({
+  SaveLoadControls: class SaveLoadControls {
+    destroy = doubles.saveLoadControlsDestroy;
+
+    constructor(
+      _host: HTMLElement,
+      onSave: () => { readonly ok: boolean; readonly message: string },
+      onLoad: () => { readonly ok: boolean; readonly message: string },
+    ) {
+      doubles.saveLoadControlInstances.push({ onSave, onLoad });
+    }
   },
 }));
 
@@ -200,6 +237,10 @@ describe('startGame camera and cleanup', () => {
     doubles.mapInstances.length = 0;
     doubles.buildPanelInstances.length = 0;
     doubles.cameraControlsInstances.length = 0;
+    doubles.advisorInstances.length = 0;
+    doubles.saveLoadControlInstances.length = 0;
+    doubles.persistenceSave.mockReturnValue({ ok: true, message: 'City saved locally.' });
+    doubles.persistenceLoad.mockReturnValue({ ok: false, code: 'not_found', message: 'No local save was found.' });
     doubles.resizeCallback = undefined;
     vi.stubGlobal('ResizeObserver', class ResizeObserver {
       constructor(callback: ResizeObserverCallback) {
@@ -238,7 +279,63 @@ describe('startGame camera and cleanup', () => {
     expect(doubles.scenarioPanelDestroy).toHaveBeenCalledOnce();
     expect(doubles.eventPanelDestroy).toHaveBeenCalledOnce();
     expect(doubles.advisorDestroy).toHaveBeenCalledOnce();
+    expect(doubles.saveLoadControlsDestroy).toHaveBeenCalledOnce();
     expect(doubles.appDestroy).toHaveBeenCalledWith(true, { children: true });
+  });
+
+  it('saves the current city and loads a validated replacement through the central refresh flow', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const controls = doubles.saveLoadControlInstances[0];
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (controls === undefined || panel === undefined) throw new Error('Expected save controls and build panel.');
+    const initialCity = panel.update.mock.lastCall?.[0] as CityState;
+    const loadedCity = createCityState();
+    loadedCity.resources.money = 123;
+    loadedCity.simulation.tick = 17;
+    doubles.persistenceLoad.mockReturnValueOnce({ ok: true, city: loadedCity, message: 'City loaded locally.' });
+
+    expect(controls.onSave()).toMatchObject({ ok: true });
+    expect(doubles.persistenceSave).toHaveBeenLastCalledWith(initialCity);
+    expect(controls.onLoad()).toMatchObject({ ok: true, message: 'City loaded locally.' });
+    expect(doubles.persistenceLoad).toHaveBeenCalledOnce();
+    expect(doubles.advisorInstances[0]?.invalidateForCityLoad).toBeDefined();
+    expect(panel.update).toHaveBeenLastCalledWith(
+      loadedCity,
+      'City loaded locally.',
+      false,
+      false,
+      false,
+      false,
+      { buildBlocked: false },
+    );
+    expect(map.refresh).toHaveBeenLastCalledWith(loadedCity, {
+      waterOverlay: false, foodOverlay: false, desirabilityOverlay: false, roadNetworkOverlay: false,
+    });
+    expect(map.fitCamera).toHaveBeenCalledOnce();
+    cleanup();
+  });
+
+  it('keeps the active city and skips refresh when Load fails', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const controls = doubles.saveLoadControlInstances[0];
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (controls === undefined || panel === undefined) throw new Error('Expected save controls and build panel.');
+    const initialCity = panel.update.mock.lastCall?.[0] as CityState;
+    const refreshCount = map.refresh.mock.calls.length;
+
+    expect(controls.onLoad()).toMatchObject({ ok: false, code: 'not_found' });
+    expect(panel.update.mock.lastCall?.[0]).toBe(initialCity);
+    expect(map.refresh).toHaveBeenCalledTimes(refreshCount);
+    expect(doubles.advisorInstances[0]?.invalidateForCityLoad).toBeDefined();
+    cleanup();
   });
 
   it('fits on initial load and reset, but ordinary resize preserves the camera', async () => {
