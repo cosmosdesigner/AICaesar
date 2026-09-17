@@ -142,7 +142,12 @@ describe('population state', () => {
     const city = createEmptyCity();
     const house = addHouse(city, 2, 2, { level: 3, population: 0 });
     addRoadWaterFoodServices(city, house);
+    addBuilding(city, 'garden', 0, 2);
+    addBuilding(city, 'garden', 2, 0);
     addWorkerPopulationForMarket(city);
+    addBuilding(city, 'fountain', 6, 0);
+    addBuilding(city, 'plaza', 4, 1);
+    addBuilding(city, 'garden', 8, 2);
 
     tick(city, POPULATION_GROWTH_INTERVAL_TICKS - 1);
     expect(house.population).toBe(0);
@@ -187,6 +192,8 @@ describe('population state', () => {
     const city = createEmptyCity();
     const house = addHouse(city, 2, 2, { level: 3, population: HOUSE_SPECIFICATIONS[3].populationCapacity - 1 });
     addRoadWaterFoodServices(city, house);
+    addBuilding(city, 'garden', 0, 2);
+    addBuilding(city, 'garden', 2, 0);
     addWorkerPopulationForMarket(city);
 
     tick(city, POPULATION_GROWTH_INTERVAL_TICKS);

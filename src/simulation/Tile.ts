@@ -1,4 +1,4 @@
-export type BuildingType = 'road' | 'house' | 'well' | 'farm' | 'granary' | 'market';
+export type BuildingType = 'road' | 'house' | 'well' | 'farm' | 'granary' | 'market' | 'garden' | 'plaza' | 'fountain';
 
 export interface Tile {
   readonly x: number;

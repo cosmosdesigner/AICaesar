@@ -113,6 +113,8 @@ function createActionForIssue(summary: CityStateSummary, issue: CityIssue): Advi
         'Add road access near the first affected economic building.',
         getAdjacentTarget(issue.affectedTiles[0]),
       );
+    case 'low_desirability':
+      return createWaitAction('Improve local urban quality manually with gardens, plazas or fountains.');
     case 'low_money':
       return createWaitAction('Money economy is not implemented enough for a safe automatic action.');
   }

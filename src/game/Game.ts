@@ -25,6 +25,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   assignWorkers(city);
   let waterOverlay = false;
   let foodOverlay = false;
+  let desirabilityOverlay = false;
   let roadNetworkOverlay = false;
   let paused = false;
   let speed: SimulationSpeed = 1;
@@ -47,19 +48,26 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     },
     () => {
       waterOverlay = !waterOverlay;
-      map.refresh(city, { waterOverlay, foodOverlay, roadNetworkOverlay });
+      map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
       app.render();
       return waterOverlay;
     },
     () => {
       foodOverlay = !foodOverlay;
-      map.refresh(city, { waterOverlay, foodOverlay, roadNetworkOverlay });
+      map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
       app.render();
       return foodOverlay;
     },
     () => {
+      desirabilityOverlay = !desirabilityOverlay;
+      map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
+      app.render();
+      return desirabilityOverlay;
+    },
+
+    () => {
       roadNetworkOverlay = !roadNetworkOverlay;
-      map.refresh(city, { waterOverlay, foodOverlay, roadNetworkOverlay });
+      map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
       app.render();
       return roadNetworkOverlay;
     },
@@ -133,7 +141,15 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       return;
     }
 
-    panel.update(city, messages[result], waterOverlay, foodOverlay, roadNetworkOverlay, { buildBlocked: isScenarioTerminal() });
+    panel.update(
+      city,
+      messages[result],
+      waterOverlay,
+      foodOverlay,
+      desirabilityOverlay,
+      roadNetworkOverlay,
+      { buildBlocked: isScenarioTerminal() },
+    );
   });
   app.stage.on('pointermove', (event: FederatedPointerEvent) => {
     if (!isPanning || lastPanPoint === undefined) return;
@@ -156,7 +172,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   };
 
   function refreshCity(message: string): void {
-    map.refresh(city, { waterOverlay, foodOverlay, roadNetworkOverlay });
+    map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
     const scenarioProgress = evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO);
     if (scenarioProgress.status !== 'active') {
       paused = true;
@@ -170,6 +186,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       scenarioProgress.resultMessage ?? message,
       waterOverlay,
       foodOverlay,
+      desirabilityOverlay,
       roadNetworkOverlay,
       { buildBlocked: scenarioProgress.status !== 'active' },
     );

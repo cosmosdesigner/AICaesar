@@ -7,6 +7,7 @@ import {
   type RoadNetwork,
 } from './RoadNetwork';
 import type { BuildingType } from './Tile';
+import { getHouseDesirability, getDesirabilityTier } from './Desirability';
 import {
   HOUSE_DEGRADE_TICKS,
   getHouseSpecification,
@@ -137,6 +138,7 @@ export function simulateTick(city: CityState): void {
       road: building.hasRoadAccess,
       water: building.hasWater,
       food: building.hasFood,
+      desirability: getDesirabilityTier(getHouseDesirability(city, building).score),
     };
     updateHouseLevel(building, services);
     clampHousePopulation(building);
@@ -200,6 +202,7 @@ export function getHouseServices(city: CityState, building: Building, network = 
     road: hasAdjacentRoad(city, building, network),
     water: hasWaterAccess(city, building, network),
     food: building.hasFood === true && getHouseFoodMarket(city, building, network) !== undefined,
+    desirability: getDesirabilityTier(getHouseDesirability(city, building).score),
   };
 }
 
@@ -330,6 +333,7 @@ export function getHousingStats(city: CityState, network = getRoadNetwork(city))
       road: hasAdjacentRoad(city, building, network),
       water: waterCoverage.has(getTileKey(building.x, building.y)),
       food: building.hasFood === true && foodReach.has(getTileKey(building.x, building.y)),
+      desirability: getDesirabilityTier(getHouseDesirability(city, building).score),
     };
     const status = getHouseStatus(building.level, services);
     if (services.road) housesWithRoadAccess += 1;

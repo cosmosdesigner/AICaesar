@@ -275,8 +275,12 @@ describe('road-reached services', () => {
     simulateTick(city);
 
     expect(hasAdjacentRoad(city, isolated)).toBe(false);
-    expect(getHouseServices(city, connected)).toEqual({ road: true, water: true, food: true });
-    expect(getHouseServices(city, isolated)).toEqual({ road: false, water: false, food: false });
+    expect(getHouseServices(city, connected)).toEqual({
+      road: true, water: true, food: true, desirability: 'medium',
+    });
+    expect(getHouseServices(city, isolated)).toEqual({
+      road: false, water: false, food: false, desirability: 'medium',
+    });
     expect(getHousingStats(city)).toMatchObject({ housesWithRoadAccess: 1, housesWithWater: 1, housesWithFood: 1 });
     expect(connected.population).toBe(3);
     expect(isolated.population).toBe(1);

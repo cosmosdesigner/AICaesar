@@ -1,5 +1,6 @@
 import { analyzeCity } from '../analysis/CityAnalyzer';
 import { BUILD_COSTS, type CityState } from '../simulation/CityState';
+import { getDesirabilityStats } from '../simulation/Desirability';
 import { getRoadNetworkStats } from '../simulation/RoadNetwork';
 import { getFinanceStats, getFoodStats, getHousingStats, getPopulationStats, getWorkforceStats } from '../simulation/Simulation';
 import type { BuildingType } from '../simulation/Tile';
@@ -11,6 +12,9 @@ export const BUILD_LABELS: Readonly<Record<BuildingType, string>> = {
   farm: 'Farm',
   granary: 'Granary',
   market: 'Market',
+  garden: 'Garden',
+  plaza: 'Plaza',
+  fountain: 'Fountain',
 };
 
 const BUILD_TITLES: Readonly<Record<BuildingType, string>> = {
@@ -20,9 +24,12 @@ const BUILD_TITLES: Readonly<Record<BuildingType, string>> = {
   farm: 'Farms produce food only with main road access and enough workers.',
   granary: 'Granaries store food only with main road access and enough workers; they supply markets within 8 road steps.',
   market: 'Markets need main road access and workers; stocked markets serve houses within 4 road steps.',
+  garden: 'Garden improves nearby urban desirability within 2 tiles.',
+  plaza: 'Plaza improves nearby urban desirability within 3 tiles.',
+  fountain: 'Fountain improves nearby urban desirability within 3 tiles.',
 };
 
-const BUILD_TOOLS: readonly BuildingType[] = ['road', 'house', 'well', 'farm', 'granary', 'market'];
+const BUILD_TOOLS: readonly BuildingType[] = ['road', 'house', 'well', 'farm', 'granary', 'market', 'garden', 'plaza', 'fountain'];
 
 export interface BuildPanelUpdateOptions {
   readonly buildBlocked?: boolean;
@@ -56,6 +63,9 @@ export class BuildPanel {
   private readonly blockedByWater = document.createElement('strong');
   private readonly blockedByFood = document.createElement('strong');
   private readonly degradingHouses = document.createElement('strong');
+  private readonly averageDesirability = document.createElement('strong');
+  private readonly lowDesirabilityHouses = document.createElement('strong');
+  private readonly goodDesirabilityHouses = document.createElement('strong');
   private readonly foodStored = document.createElement('strong');
   private readonly granaryStock = document.createElement('strong');
   private readonly marketStock = document.createElement('strong');
@@ -81,6 +91,7 @@ export class BuildPanel {
   private readonly waterOverlay = document.createElement('button');
   private readonly foodOverlay = document.createElement('button');
   private readonly roadNetworkOverlay = document.createElement('button');
+  private readonly desirabilityOverlay = document.createElement('button');
   private readonly status = document.createElement('p');
 
   constructor(
@@ -88,6 +99,7 @@ export class BuildPanel {
     onReset: () => void,
     onWaterOverlayToggle: () => boolean,
     onFoodOverlayToggle: () => boolean,
+    onDesirabilityOverlayToggle: () => boolean,
     onRoadNetworkOverlayToggle: () => boolean,
   ) {
     this.element.className = 'build-panel';
@@ -143,6 +155,9 @@ export class BuildPanel {
       this.createStat('Granaries', this.granaries),
       this.createStat('Markets', this.markets),
       this.createStat('Tiles com comida', this.foodTiles),
+      this.createStat('Avg desirability', this.averageDesirability),
+      this.createStat('Low desirability houses', this.lowDesirabilityHouses),
+      this.createStat('Good desirability houses', this.goodDesirabilityHouses),
       this.createStat('População', this.population),
       this.createStat('Available housing', this.availableHousing),
       this.createStat('Growth last tick', this.populationLastChange),
@@ -207,6 +222,18 @@ export class BuildPanel {
         : 'Food coverage overlay hidden.';
     });
 
+    this.desirabilityOverlay.type = 'button';
+    this.desirabilityOverlay.textContent = 'Show desirability: Off';
+    this.desirabilityOverlay.title = 'Show local urban quality: green is good, orange is medium and red is low.';
+    this.desirabilityOverlay.setAttribute('aria-pressed', 'false');
+    this.desirabilityOverlay.addEventListener('click', () => {
+      const enabled = onDesirabilityOverlayToggle();
+      this.setDesirabilityOverlay(enabled);
+      this.status.textContent = enabled
+        ? 'Desirability: green = good, orange = medium, red = low.'
+        : 'Desirability overlay hidden.';
+    });
+
     this.roadNetworkOverlay.type = 'button';
     this.roadNetworkOverlay.textContent = 'Show road network: Off';
     this.roadNetworkOverlay.title = 'Green roads belong to the main network; orange roads are isolated. Isolated farms, granaries, markets and wells do not work.';
@@ -239,6 +266,7 @@ export class BuildPanel {
       finance,
       this.waterOverlay,
       this.foodOverlay,
+      this.desirabilityOverlay,
       this.roadNetworkOverlay,
       this.issues,
       reset,
@@ -247,13 +275,22 @@ export class BuildPanel {
     host.append(this.element);
   }
 
-  update(city: CityState, message: string, waterOverlay: boolean, foodOverlay: boolean, roadNetworkOverlay: boolean, options: BuildPanelUpdateOptions = {}): void {
+  update(
+    city: CityState,
+    message: string,
+    waterOverlay: boolean,
+    foodOverlay: boolean,
+    desirabilityOverlay: boolean,
+    roadNetworkOverlay: boolean,
+    options: BuildPanelUpdateOptions = {},
+  ): void {
     const housingStats = getHousingStats(city);
     const foodStats = getFoodStats(city);
     const workforceStats = getWorkforceStats(city);
     const populationStats = getPopulationStats(city);
     const financeStats = getFinanceStats(city);
     const networkStats = getRoadNetworkStats(city);
+    const desirabilityStats = getDesirabilityStats(city);
     this.mainRoadTiles.textContent = `${networkStats.mainRoadTiles} tiles`;
     this.connectedBuildings.textContent = `${networkStats.connectedBuildings}/${networkStats.totalBuildings}`;
     this.isolatedBuildings.textContent = String(networkStats.isolatedBuildings);
@@ -279,6 +316,9 @@ export class BuildPanel {
     this.granaries.textContent = String(foodStats.granaries);
     this.markets.textContent = String(foodStats.markets);
     this.foodTiles.textContent = String(foodStats.foodCoveredTiles);
+    this.averageDesirability.textContent = String(desirabilityStats.average);
+    this.lowDesirabilityHouses.textContent = String(desirabilityStats.housesWithLowDesirability);
+    this.goodDesirabilityHouses.textContent = String(desirabilityStats.housesWithGoodDesirability);
     this.population.textContent = `${populationStats.population}/${populationStats.capacity}`;
     this.availableHousing.textContent = String(populationStats.availableHousing);
     this.populationLastChange.textContent = formatSignedFinanceValue(populationStats.lastChange);
@@ -299,6 +339,7 @@ export class BuildPanel {
     for (const button of this.toolButtons) button.disabled = buildBlocked;
     this.setWaterOverlay(waterOverlay);
     this.setFoodOverlay(foodOverlay);
+    this.setDesirabilityOverlay(desirabilityOverlay);
     this.setRoadNetworkOverlay(roadNetworkOverlay);
     const issues = analyzeCity(city).slice(0, 3);
     this.issuesList.replaceChildren();
@@ -335,6 +376,11 @@ export class BuildPanel {
   private setFoodOverlay(enabled: boolean): void {
     this.foodOverlay.textContent = `Show food coverage: ${enabled ? 'On' : 'Off'}`;
     this.foodOverlay.setAttribute('aria-pressed', String(enabled));
+  }
+
+  private setDesirabilityOverlay(enabled: boolean): void {
+    this.desirabilityOverlay.textContent = `Show desirability: ${enabled ? 'On' : 'Off'}`;
+    this.desirabilityOverlay.setAttribute('aria-pressed', String(enabled));
   }
 
   private setRoadNetworkOverlay(enabled: boolean): void {

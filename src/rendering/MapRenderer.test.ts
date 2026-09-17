@@ -13,6 +13,9 @@ const textures: MapTextures = {
   farm: Texture.EMPTY,
   granary: Texture.EMPTY,
   market: Texture.EMPTY,
+  garden: Texture.EMPTY,
+  plaza: Texture.EMPTY,
+  fountain: Texture.EMPTY,
 };
 
 function createRoadCity() {
@@ -74,6 +77,20 @@ describe('road network rendering', () => {
     expect(map.getCameraState()).toEqual(camera);
     map.refresh(city, { roadNetworkOverlay: false });
     expect(map.getCameraState()).toEqual(camera);
+    map.destroy({ children: true });
+  });
+});
+
+describe('desirability rendering', () => {
+  it('draws a full-map desirability overlay without affecting water and food overlays', () => {
+    const city = createRoadCity();
+    placeBuilding(city, 3, 2, 'garden');
+    const map = new MapRenderer(city, textures);
+
+    map.refresh(city, { waterOverlay: true, foodOverlay: true, desirabilityOverlay: true });
+
+    const overlays = map.children[1] as Container;
+    expect(overlays.children).toHaveLength(3);
     map.destroy({ children: true });
   });
 });

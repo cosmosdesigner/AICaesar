@@ -11,6 +11,9 @@ export const BUILD_COSTS: Readonly<Record<BuildingType, number>> = {
   farm: 45,
   granary: 60,
   market: 50,
+  garden: 12,
+  plaza: 25,
+  fountain: 40,
 };
 
 export interface Building {

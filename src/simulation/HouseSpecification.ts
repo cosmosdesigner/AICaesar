@@ -1,5 +1,6 @@
 export type HouseLevel = 1 | 2 | 3;
-export type HouseRequirement = 'road' | 'water' | 'food';
+export type HouseRequirement = 'road' | 'water' | 'food' | 'desirability';
+export type HouseDesirability = 'low' | 'medium' | 'good';
 
 export interface HouseLevelSpecification {
   readonly level: HouseLevel;
@@ -13,6 +14,7 @@ export interface HouseServices {
   readonly road: boolean;
   readonly water: boolean;
   readonly food: boolean;
+  readonly desirability: HouseDesirability;
 }
 
 export interface HouseStatus {
@@ -24,13 +26,13 @@ export interface HouseStatus {
   readonly shouldDegrade: boolean;
 }
 
-export const HOUSE_REQUIREMENT_ORDER: readonly HouseRequirement[] = ['road', 'water', 'food'];
+export const HOUSE_REQUIREMENT_ORDER: readonly HouseRequirement[] = ['road', 'water', 'food', 'desirability'];
 export const HOUSE_DEGRADE_TICKS = 4;
 
 export const HOUSE_SPECIFICATIONS: Readonly<Record<HouseLevel, HouseLevelSpecification>> = {
   1: { level: 1, populationCapacity: 4, taxPerPeriod: 2, requirements: [], upgradeTicks: 0 },
   2: { level: 2, populationCapacity: 8, taxPerPeriod: 4, requirements: ['road', 'water'], upgradeTicks: 3 },
-  3: { level: 3, populationCapacity: 14, taxPerPeriod: 7, requirements: ['road', 'water', 'food'], upgradeTicks: 5 },
+  3: { level: 3, populationCapacity: 14, taxPerPeriod: 7, requirements: ['road', 'water', 'food', 'desirability'], upgradeTicks: 5 },
 };
 
 export function normalizeHouseLevel(level: number | undefined): HouseLevel {
@@ -63,8 +65,11 @@ export function getHouseStatus(level: number | undefined, services: HouseService
 }
 
 function getTargetLevel(services: HouseServices): HouseLevel {
+  if (services.desirability === 'low') return 1;
   for (const level of [3, 2] as const) {
-    if (HOUSE_SPECIFICATIONS[level].requirements.every((requirement) => services[requirement])) return level;
+    if (HOUSE_SPECIFICATIONS[level].requirements.every((requirement) => isRequirementMet(requirement, services))) {
+      return level;
+    }
   }
   return 1;
 }
@@ -74,6 +79,11 @@ function getMissingRequirement(
   services: HouseServices,
 ): HouseRequirement | undefined {
   return HOUSE_REQUIREMENT_ORDER.find((requirement) => (
-    specification.requirements.includes(requirement) && !services[requirement]
+    specification.requirements.includes(requirement) && !isRequirementMet(requirement, services)
   ));
+}
+
+function isRequirementMet(requirement: HouseRequirement, services: HouseServices): boolean {
+  if (requirement === 'desirability') return services.desirability === 'good';
+  return services[requirement];
 }

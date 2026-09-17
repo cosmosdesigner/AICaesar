@@ -1,5 +1,9 @@
 import type { Building, CityState } from '../simulation/CityState';
 import {
+  getHouseDesirability,
+  LOW_DESIRABILITY_THRESHOLD,
+} from '../simulation/Desirability';
+import {
   getFoodCoveredTiles,
   getFoodStats,
   getHouseServices,
@@ -16,6 +20,7 @@ export type CityIssueType =
   | 'food_distribution_shortage'
   | 'worker_shortage'
   | 'road_access_missing'
+  | 'low_desirability'
   | 'low_money';
 
 export type CityIssueSeverity = 'low' | 'medium' | 'high';
@@ -57,7 +62,8 @@ const ISSUE_TYPE_ORDER: Readonly<Record<CityIssueType, number>> = {
   food_distribution_shortage: 3,
   worker_shortage: 4,
   road_access_missing: 5,
-  low_money: 6,
+  low_desirability: 6,
+  low_money: 7,
 };
 
 export function summarizeCity(city: CityState, network = getRoadNetwork(city)): CityStateSummary {
@@ -152,6 +158,24 @@ export function analyzeCity(city: CityState): CityIssue[] {
       affectedTiles: toTiles(getInactiveWorkplaces(city, network)),
       explanation: `Faltam ${summary.workerShortage} trabalhadores.`,
       cause: `${workforceStats.workersRequired} trabalhadores necessários para ${workforceStats.workersAvailable} disponíveis.`,
+    });
+  }
+
+  const housesWithLowDesirability = getSortedBuildings(city, 'house')
+    .filter((building) => getHouseDesirability(city, building).score < LOW_DESIRABILITY_THRESHOLD);
+  if (housesWithLowDesirability.length > 0) {
+    const breakdowns = housesWithLowDesirability.map((building) => getHouseDesirability(city, building));
+    const hasNearbyEconomicBuildings = breakdowns.some((breakdown) => breakdown.negative < 0);
+    const hasNearbyAmenities = breakdowns.some((breakdown) => breakdown.positive > 0);
+    const causes: string[] = [];
+    if (hasNearbyEconomicBuildings) causes.push('Farms, granaries ou markets estão demasiado perto.');
+    if (!hasNearbyAmenities) causes.push('Não há gardens, plazas ou fountains próximos para compensar.');
+    issues.push({
+      type: 'low_desirability',
+      severity: shortageSeverity(housesWithLowDesirability.length, summary.houses),
+      affectedTiles: toTiles(housesWithLowDesirability),
+      explanation: `Desirability baixa em ${housesWithLowDesirability.length} casa${housesWithLowDesirability.length === 1 ? '' : 's'}.`,
+      cause: causes.join(' '),
     });
   }
 

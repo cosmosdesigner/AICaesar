@@ -37,6 +37,7 @@ const doubles = vi.hoisted(() => ({
     onReset: () => void;
     onWaterOverlayToggle: () => boolean;
     onFoodOverlayToggle: () => boolean;
+    onDesirabilityOverlayToggle: () => boolean;
     onRoadNetworkOverlayToggle: () => boolean;
   }>,
   cameraControlsInstances: [] as Array<{
@@ -105,9 +106,12 @@ vi.mock('../rendering/MapRenderer', () => ({
 vi.mock('../ui/BuildPanel', () => ({
   BUILD_LABELS: {
     farm: 'Farm',
+    fountain: 'Fountain',
+    garden: 'Garden',
     granary: 'Granary',
     house: 'House',
     market: 'Market',
+    plaza: 'Plaza',
     road: 'Road',
     well: 'Well',
   },
@@ -121,6 +125,7 @@ vi.mock('../ui/BuildPanel', () => ({
       onReset: () => void,
       onWaterOverlayToggle: () => boolean,
       onFoodOverlayToggle: () => boolean,
+      onDesirabilityOverlayToggle: () => boolean,
       onRoadNetworkOverlayToggle: () => boolean,
     ) {
       doubles.buildPanelInstances.push({
@@ -129,6 +134,7 @@ vi.mock('../ui/BuildPanel', () => ({
         onReset,
         onWaterOverlayToggle,
         onFoodOverlayToggle,
+        onDesirabilityOverlayToggle,
         onRoadNetworkOverlayToggle,
       });
     }
@@ -288,20 +294,21 @@ describe('startGame camera and cleanup', () => {
     expect(panel.onRoadNetworkOverlayToggle()).toBe(true);
     expect(panel.onWaterOverlayToggle()).toBe(true);
     expect(panel.onFoodOverlayToggle()).toBe(true);
+    expect(panel.onDesirabilityOverlayToggle()).toBe(true);
     tick();
     expect(map.refresh).toHaveBeenLastCalledWith(expect.anything(), {
-      waterOverlay: true, foodOverlay: true, roadNetworkOverlay: true,
+      waterOverlay: true, foodOverlay: true, desirabilityOverlay: true, roadNetworkOverlay: true,
     });
     expect(map.fitCamera).toHaveBeenCalledOnce();
 
     panel.onReset();
     expect(map.refresh).toHaveBeenLastCalledWith(expect.anything(), {
-      waterOverlay: true, foodOverlay: true, roadNetworkOverlay: true,
+      waterOverlay: true, foodOverlay: true, desirabilityOverlay: true, roadNetworkOverlay: true,
     });
     expect(map.fitCamera).toHaveBeenCalledTimes(2);
     expect(panel.onRoadNetworkOverlayToggle()).toBe(false);
     expect(map.refresh).toHaveBeenLastCalledWith(expect.anything(), {
-      waterOverlay: true, foodOverlay: true, roadNetworkOverlay: false,
+      waterOverlay: true, foodOverlay: true, desirabilityOverlay: true, roadNetworkOverlay: false,
     });
     cleanup();
   });

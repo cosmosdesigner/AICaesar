@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import type { MapTextures } from '../assets/AssetManifest';
 import type { Building, CityState } from '../simulation/CityState';
+import { getDesirabilityOverlayTiles } from '../simulation/Desirability';
 import { getRoadNetwork } from '../simulation/RoadNetwork';
 import { getFoodCoveredTiles, getTileKey, getWaterCoveredTiles, isWorkplace } from '../simulation/Simulation';
 import { createFittedCamera, type CameraState } from './Camera';
@@ -44,6 +45,17 @@ export class MapRenderer extends Container {
       for (const tile of city.tiles) {
         if (!coveredTiles.has(getTileKey(tile.x, tile.y))) continue;
         this.drawCoverageTile(overlay, tile.x, tile.y, 0x65b84a, 0.28);
+      }
+      overlays.addChild(overlay);
+    }
+
+    if (options.desirabilityOverlay === true) {
+      const desirabilityTiles = getDesirabilityOverlayTiles(city);
+      const overlay = new Graphics();
+      for (const tile of city.tiles) {
+        const score = desirabilityTiles.get(getTileKey(tile.x, tile.y))!.score;
+        const color = score < 40 ? 0xd94f4f : score >= 60 ? 0x65b84a : 0xe3a93b;
+        this.drawCoverageTile(overlay, tile.x, tile.y, color, 0.35);
       }
       overlays.addChild(overlay);
     }
@@ -114,6 +126,12 @@ export class MapRenderer extends Container {
     if (isWorkplace(building.type) && building.active !== true) {
       sprite.alpha = 0.55;
       sprite.tint = 0xb06a6a;
+    } else if (building.type === 'garden') {
+      sprite.tint = 0x75b85a;
+    } else if (building.type === 'plaza') {
+      sprite.tint = 0xd6b56a;
+    } else if (building.type === 'fountain') {
+      sprite.tint = 0x63b6df;
     }
     return sprite;
   }
@@ -137,5 +155,6 @@ interface TilePosition {
 interface MapRenderOptions {
   readonly waterOverlay?: boolean;
   readonly foodOverlay?: boolean;
+  readonly desirabilityOverlay?: boolean;
   readonly roadNetworkOverlay?: boolean;
 }

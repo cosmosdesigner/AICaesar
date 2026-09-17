@@ -42,12 +42,18 @@ describe('prototype asset texture sampling', () => {
       market: createTexture(),
       road: createTexture(),
       well: createTexture(),
+      garden: createTexture(),
+      plaza: createTexture(),
+      fountain: createTexture(),
     };
 
     const configured = configureMapTextureSampling(textures);
 
     expect(configured).toBe(textures);
     expect(Object.values(textures).map((texture) => texture.source.scaleMode)).toEqual([
+      'nearest',
+      'nearest',
+      'nearest',
       'nearest',
       'nearest',
       'nearest',

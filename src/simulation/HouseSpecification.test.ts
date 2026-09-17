@@ -72,28 +72,39 @@ describe('HouseSpecification', () => {
     expect(HOUSE_SPECIFICATIONS).toEqual({
       1: { level: 1, populationCapacity: 4, taxPerPeriod: 2, requirements: [], upgradeTicks: 0 },
       2: { level: 2, populationCapacity: 8, taxPerPeriod: 4, requirements: ['road', 'water'], upgradeTicks: 3 },
-      3: { level: 3, populationCapacity: 14, taxPerPeriod: 7, requirements: ['road', 'water', 'food'], upgradeTicks: 5 },
+      3: { level: 3, populationCapacity: 14, taxPerPeriod: 7, requirements: ['road', 'water', 'food', 'desirability'], upgradeTicks: 5 },
     });
     expect(HOUSE_DEGRADE_TICKS).toBe(4);
   });
 
-  it('exposes missing road, water and food in requirement order', () => {
-    expect(getHouseStatus(1, { road: false, water: false, food: false })).toMatchObject({
+  it('exposes missing requirements in stable order and distinguishes desirability tiers', () => {
+    expect(getHouseStatus(1, {
+      road: false, water: false, food: false, desirability: 'medium',
+    })).toMatchObject({
       currentLevel: 1,
       targetLevel: 1,
       missingForNextLevel: 'road',
       canUpgrade: false,
       shouldDegrade: false,
     });
-    expect(getHouseStatus(1, { road: true, water: false, food: false }).missingForNextLevel).toBe('water');
-    expect(getHouseStatus(2, { road: true, water: true, food: false })).toMatchObject({
+    expect(getHouseStatus(1, {
+      road: true, water: false, food: false, desirability: 'medium',
+    }).missingForNextLevel).toBe('water');
+    expect(getHouseStatus(2, {
+      road: true, water: true, food: false, desirability: 'medium',
+    })).toMatchObject({
       currentLevel: 2,
       targetLevel: 2,
       missingForNextLevel: 'food',
       canUpgrade: false,
       shouldDegrade: false,
     });
-    expect(getHouseStatus(3, { road: false, water: true, food: true })).toMatchObject({
+    expect(getHouseStatus(2, {
+      road: true, water: true, food: true, desirability: 'medium',
+    }).missingForNextLevel).toBe('desirability');
+    expect(getHouseStatus(3, {
+      road: false, water: true, food: true, desirability: 'good',
+    })).toMatchObject({
       currentLevel: 3,
       targetLevel: 1,
       missingForCurrentLevel: 'road',
@@ -138,6 +149,8 @@ describe('house evolution and degradation', () => {
     addBuilding(city, 'market', 4, 2, { active: false, storedFood: 20 });
     connectFoodSupport(city);
 
+    addBuilding(city, 'garden', 0, 2);
+    addBuilding(city, 'garden', 2, 0);
     tick(city, HOUSE_SPECIFICATIONS[3].upgradeTicks - 1);
     expect(house.level).toBe(2);
     expect(house.upgradeProgress).toBe(4);
@@ -175,10 +188,24 @@ describe('house evolution and degradation', () => {
     expect(house.degradeProgress).toBe(0);
   });
 
+  it('degrades a level 2 house with low desirability despite full road and water service', () => {
+    const city = createEmptyCity();
+    const house = addBuilding(city, 'house', 2, 2, { level: 2, population: 8, upgradeProgress: 0, degradeProgress: 0 });
+    connectRoadAndWater(city);
+    addBuilding(city, 'granary', 5, 2);
+
+    tick(city, HOUSE_DEGRADE_TICKS);
+
+    expect(house.level).toBe(1);
+    expect(house.degradeProgress).toBe(0);
+  });
+
   it('cancels pending degradation when services recover before the limit', () => {
     const city = createEmptyCity();
     const house = addBuilding(city, 'house', 2, 2, { level: 3, population: 14, upgradeProgress: 0, degradeProgress: 0 });
     connectRoadAndWater(city);
+    addBuilding(city, 'garden', 0, 2);
+    addBuilding(city, 'garden', 2, 0);
     addBuilding(city, 'house', 6, 4, { level: 3, population: 14 });
     addBuilding(city, 'house', 6, 5, { level: 3, population: 14 });
 

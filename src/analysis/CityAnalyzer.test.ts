@@ -152,6 +152,21 @@ describe('CityAnalyzer', () => {
     expect(issue?.cause).toContain('market');
   });
 
+  it('reports low desirability houses in deterministic position order', () => {
+    const city = createEmptyCity();
+    addBuilding(city, 'house', 2, 1);
+    addBuilding(city, 'house', 1, 1);
+    addBuilding(city, 'granary', 1, 2);
+
+    const issue = analyzeCity(city).find((candidate) => candidate.type === 'low_desirability');
+
+    expect(issue).toMatchObject({
+      severity: 'high',
+      affectedTiles: [{ x: 1, y: 1 }, { x: 2, y: 1 }],
+    });
+    expect(issue?.cause).toMatch(/granaries.*demasiado perto/i);
+  });
+
   it('detects worker shortage deterministically', () => {
     const city = createEmptyCity();
     addBuilding(city, 'road', 1, 2);
@@ -172,7 +187,8 @@ describe('CityAnalyzer', () => {
         food_distribution_shortage: 3,
         worker_shortage: 4,
         road_access_missing: 5,
-        low_money: 6,
+        low_desirability: 6,
+        low_money: 7,
       } as const;
       return severityOrder[a.severity] - severityOrder[b.severity]
         || typeOrder[a.type] - typeOrder[b.type]

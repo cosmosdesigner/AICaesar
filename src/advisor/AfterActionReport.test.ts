@@ -102,8 +102,8 @@ describe('AfterActionReport', () => {
       workerShortage: 0,
       activeWorkplaces: 1,
       inactiveWorkplaces: 0,
-      issueCount: 1,
-      highSeverityIssues: 1,
+      issueCount: 2,
+      highSeverityIssues: 2,
     });
   });
 

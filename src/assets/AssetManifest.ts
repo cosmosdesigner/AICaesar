@@ -12,7 +12,7 @@ export const assetManifest = {
   market: `${base}market/commerce_00001.png`,
 } as const;
 
-export type MapTextures = Record<keyof typeof assetManifest, Texture>;
+export type MapTextures = Record<keyof typeof assetManifest | 'garden' | 'plaza' | 'fountain', Texture>;
 
 export const PROTOTYPE_TEXTURE_SCALE_MODE: SCALE_MODE = 'nearest';
 
@@ -23,7 +23,10 @@ export function configureNearestSampling(texture: Texture): Texture {
 }
 
 export function configureMapTextureSampling(textures: MapTextures): MapTextures {
+  const configuredTextures = new Set<Texture>();
   for (const texture of Object.values(textures)) {
+    if (configuredTextures.has(texture)) continue;
+    configuredTextures.add(texture);
     configureNearestSampling(texture);
   }
   return textures;
@@ -40,5 +43,16 @@ export async function loadMapTextures(): Promise<MapTextures> {
     Assets.load<Texture>(assetManifest.granary),
     Assets.load<Texture>(assetManifest.market),
   ]);
-  return configureMapTextureSampling({ grass, road, house, well, farm, granary, market });
+  return configureMapTextureSampling({
+    grass,
+    road,
+    house,
+    well,
+    farm,
+    granary,
+    market,
+    garden: farm,
+    plaza: market,
+    fountain: well,
+  });
 }
