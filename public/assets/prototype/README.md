@@ -1,12 +1,12 @@
-# Assets temporários — apenas prototipagem local
+# Assets locais — consumo próprio
 
-Estes sete PNGs foram copiados sem alterações dos recursos locais da **Caesaria** em `/root/caesaria-game-inspect/resources`. São usados apenas para validar a renderização das fases de protótipo; não são assets próprios do AICaesar.
+Estes nove PNGs foram copiados sem alterações dos recursos locais da **Caesaria** em `/root/caesaria-game-inspect/resources` e são os assets finais desta instalação pessoal do AICaesar. Não são assets próprios do AICaesar.
 
 ## Licenciamento
 
 A licença e os direitos de redistribuição destes sprites **não foram verificados**. A licença do código da Caesaria não deve ser interpretada como licença dos gráficos; alguns recursos podem derivar de Caesar III. Este aviso não concede direitos de utilização ou redistribuição.
 
-**Não publicar nem distribuir estes assets (incluindo a pasta `dist/`). Substituir todos por arte própria ou com licença explícita compatível antes de qualquer release pública ou comercial.** O build do Vite copia esta pasta para `dist/assets/prototype`.
+O projecto destina-se a consumo próprio. Estes assets não devem ser redistribuídos nem usados numa release pública ou comercial sem confirmar os direitos aplicáveis. O build do Vite copia esta pasta para `dist/assets/prototype`.
 
 ## Subset usado
 
@@ -26,4 +26,4 @@ Caminhos de origem relativos a `/root/caesaria-game-inspect/resources`:
 
 O diretório original `way/` contém indicadores de percurso, não pavimento de estrada. Por isso, a estrada de demonstração usa o pavimento de `ground/`, guardado localmente em `way/`. A relva está originalmente em `land1a/`, não em `ground/`. Não foram copiados atlas nem pastas completas, exceto os dois spritesheets mínimos para os frames de actividade.
 
-Total: 9 PNGs. Todos são carregados e renderizados. Os ficheiros permanecem inalterados; a escala é aplicada no renderer. Os dois atlases de actividade são a fonte mínima dos frames usados e foram extraídos sem alteração dos arquivos locais Caesaria.
+Total: 9 PNGs. Todos são carregados e renderizados. Os ficheiros permanecem inalterados; a escala é aplicada no renderer. Os dois atlases de actividade são a fonte dos frames usados e foram extraídos sem alteração dos arquivos locais Caesaria.
