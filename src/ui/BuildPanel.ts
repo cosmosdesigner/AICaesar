@@ -5,7 +5,9 @@ import { getRoadNetworkStats } from '../simulation/RoadNetwork';
 import { getFinanceStats, getFoodStats, getHousingStats, getPopulationStats, getWorkforceStats } from '../simulation/Simulation';
 import type { BuildingType } from '../simulation/Tile';
 
-export const BUILD_LABELS: Readonly<Record<BuildingType, string>> = {
+export type BuildTool = BuildingType | 'bulldoze';
+
+export const BUILD_LABELS: Readonly<Record<BuildTool, string>> = {
   road: 'Road',
   house: 'House',
   well: 'Well',
@@ -15,9 +17,10 @@ export const BUILD_LABELS: Readonly<Record<BuildingType, string>> = {
   garden: 'Garden',
   plaza: 'Plaza',
   fountain: 'Fountain',
+  bulldoze: 'Bulldoze',
 };
 
-const BUILD_TITLES: Readonly<Record<BuildingType, string>> = {
+const BUILD_TITLES: Readonly<Record<BuildTool, string>> = {
   road: 'Roads connect buildings to the main road network. Isolated roads do not activate buildings.',
   house: 'Houses begin empty and attract residents with main road access, water and food reached along roads.',
   well: 'Wells connected to the main network provide water within 3 road steps. Isolated wells do not work.',
@@ -27,9 +30,12 @@ const BUILD_TITLES: Readonly<Record<BuildingType, string>> = {
   garden: 'Garden improves nearby urban desirability within 2 tiles.',
   plaza: 'Plaza improves nearby urban desirability within 3 tiles.',
   fountain: 'Fountain improves nearby urban desirability within 3 tiles.',
+  bulldoze: 'Remove one building or road without a refund.',
 };
 
-const BUILD_TOOLS: readonly BuildingType[] = ['road', 'house', 'well', 'farm', 'granary', 'market', 'garden', 'plaza', 'fountain'];
+const BUILD_TOOLS: readonly BuildTool[] = [
+  'road', 'house', 'well', 'farm', 'granary', 'market', 'garden', 'plaza', 'fountain', 'bulldoze',
+];
 
 export interface BuildPanelUpdateOptions {
   readonly buildBlocked?: boolean;
@@ -37,7 +43,7 @@ export interface BuildPanelUpdateOptions {
 
 
 export class BuildPanel {
-  selectedTool: BuildingType = 'road';
+  selectedTool: BuildTool = 'road';
   private readonly toolButtons: HTMLButtonElement[] = [];
   private readonly element = document.createElement('section');
   private readonly money = document.createElement('strong');
@@ -119,7 +125,9 @@ export class BuildPanel {
     for (const tool of BUILD_TOOLS) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.textContent = `${BUILD_LABELS[tool]} (${BUILD_COSTS[tool]})`;
+      button.textContent = tool === 'bulldoze'
+        ? BUILD_LABELS[tool]
+        : `${BUILD_LABELS[tool]} (${BUILD_COSTS[tool]})`;
       button.title = BUILD_TITLES[tool];
       button.setAttribute('aria-pressed', String(tool === this.selectedTool));
       button.addEventListener('click', () => {
@@ -127,7 +135,9 @@ export class BuildPanel {
         this.selection.textContent = BUILD_LABELS[tool];
         for (const sibling of tools.children) sibling.setAttribute('aria-pressed', 'false');
         button.setAttribute('aria-pressed', 'true');
-        this.status.textContent = 'Clique num tile vazio para construir.';
+        this.status.textContent = tool === 'bulldoze'
+          ? 'Clique num edifício ou estrada para demolir.'
+          : 'Clique num tile vazio para construir.';
       });
       this.toolButtons.push(button);
       tools.append(button);

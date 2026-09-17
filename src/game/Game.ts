@@ -10,7 +10,13 @@ import {
   evaluateScenario,
   getScenarioContext,
 } from '../scenario/Scenario';
-import { createCityState, placeBuilding, type BuildResult } from '../simulation/CityState';
+import {
+  createCityState,
+  demolishBuilding,
+  placeBuilding,
+  type BuildResult,
+  type DemolishResult,
+} from '../simulation/CityState';
 import { assignWorkers, simulateTick } from '../simulation/Simulation';
 import { fulfillImperialRequest } from '../events/Events';
 import { loadCityState, saveCityState } from '../persistence/CitySave';
@@ -125,17 +131,22 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       const result = loadCityState();
       if (result.ok) {
         city = result.city;
-        advisor.invalidateForCityLoad();
+        advisor.invalidateForCityChange('Advisor plan cleared after loading a different city.');
         refreshCity(result.message);
       }
       return result;
     },
   );
 
-  const messages: Record<Exclude<BuildResult, 'built'>, string> = {
+  const buildMessages: Record<Exclude<BuildResult, 'built'>, string> = {
     'outside-map': 'Construa dentro do mapa.',
     occupied: 'Tile ocupado. Escolha um tile vazio.',
     'insufficient-funds': 'Dinheiro insuficiente.',
+  };
+  const demolishMessages: Record<Exclude<DemolishResult, 'demolished'>, string> = {
+    'outside-map': 'Demola dentro do mapa.',
+    empty: 'Não há edifício ou estrada neste tile.',
+    'inconsistent-state': 'Demolição bloqueada: os dados do edifício são inconsistentes.',
   };
   const local = new Point();
   app.stage.eventMode = 'static';
@@ -151,12 +162,33 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     }
     if (event.button !== 0) return;
     if (isScenarioTerminal()) {
-      refreshCity('Construção bloqueada: o cenário terminou. Use Reset para recomeçar.');
+      refreshCity('Construção e demolição bloqueadas: o cenário terminou. Use Reset para recomeçar.');
       return;
     }
 
     map.toLocal(event.global, undefined, local);
     const tile = screenToGrid(local.x, local.y);
+    if (panel.selectedTool === 'bulldoze') {
+      const result = tile ? demolishBuilding(city, tile.x, tile.y) : 'outside-map';
+      if (result === 'demolished') {
+        assignWorkers(city);
+        advisor.invalidateForCityChange('Advisor plan cleared after demolition.');
+        refreshCity('Edifício demolido.');
+        return;
+      }
+
+      panel.update(
+        city,
+        demolishMessages[result],
+        waterOverlay,
+        foodOverlay,
+        desirabilityOverlay,
+        roadNetworkOverlay,
+        { buildBlocked: isScenarioTerminal() },
+      );
+      return;
+    }
+
     const result = tile ? placeBuilding(city, tile.x, tile.y, panel.selectedTool) : 'outside-map';
     if (result === 'built') {
       assignWorkers(city);
@@ -166,7 +198,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
 
     panel.update(
       city,
-      messages[result],
+      buildMessages[result],
       waterOverlay,
       foodOverlay,
       desirabilityOverlay,

@@ -119,6 +119,24 @@ export function isBuildingSuppressed(city: CityState, building: Building): boole
   return getActiveEvent(city, 'fire')?.targetBuildingId === building.id;
 }
 
+export function clearBuildingEventTarget(city: CityState, buildingId: string): void {
+  const state = city.simulation.events;
+  if (state === undefined) return;
+
+  for (let index = 0; index < state.active.length; index += 1) {
+    const event = state.active[index];
+    if (event?.targetBuildingId !== buildingId) continue;
+    const clearedEvent = { ...event };
+    delete clearedEvent.targetBuildingId;
+    state.active[index] = {
+      ...clearedEvent,
+      message: event.type === 'fire'
+        ? 'Fire remains active without a suppressed building.'
+        : event.message,
+    };
+  }
+}
+
 export function getEventSummary(city: CityState): readonly EventSummary[] {
   const tick = city.simulation.tick;
   return ensureEventState(city).active

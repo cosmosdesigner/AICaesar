@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { assignWorkers, getFoodStats, getWorkforceStats, simulateTick } from './Simulation';
-import { BUILD_COSTS, createCityState, INITIAL_MONEY, placeBuilding } from './CityState';
+import { getRoadNetworkStats } from './RoadNetwork';
+import { assignWorkers, getFoodStats, getPopulation, getWorkforceStats, simulateTick } from './Simulation';
+import {
+  BUILD_COSTS,
+  createCityState,
+  demolishBuilding,
+  getBuildingAt,
+  getTile,
+  INITIAL_MONEY,
+  placeBuilding,
+} from './CityState';
 import type { BuildingType } from './Tile';
 
 function countByType(buildings: readonly { readonly type: BuildingType }[]): Record<BuildingType, number> {
@@ -78,5 +87,81 @@ describe('createCityState', () => {
       foodCapacity: 140,
       foodStored: 2,
     });
+  });
+});
+
+describe('demolishBuilding', () => {
+  it('removes every building type and clears its tile without a refund or tick', () => {
+    const city = createCityState();
+    const types: readonly BuildingType[] = [
+      'road', 'house', 'well', 'farm', 'granary', 'market', 'garden', 'plaza', 'fountain',
+    ];
+    city.resources.money = 2_000;
+
+    for (const [index, type] of types.entries()) {
+      expect(placeBuilding(city, index, 0, type)).toBe('built');
+    }
+    const moneyBefore = city.resources.money;
+    const tickBefore = city.simulation.tick;
+
+    for (const [index, type] of types.entries()) {
+      const building = getBuildingAt(city, index, 0);
+      expect(building?.type).toBe(type);
+      expect(demolishBuilding(city, index, 0)).toBe('demolished');
+      expect(getTile(city, index, 0)?.buildingId).toBeUndefined();
+      expect(city.buildings.find((candidate) => candidate.id === building?.id)).toBeUndefined();
+    }
+
+    expect(city.resources.money).toBe(moneyBefore);
+    expect(city.simulation.tick).toBe(tickBefore);
+  });
+
+  it('does not mutate empty or outside-map attempts', () => {
+    const city = createCityState();
+    const before = JSON.stringify(city);
+
+    expect(demolishBuilding(city, -1, 0)).toBe('outside-map');
+    expect(demolishBuilding(city, 0, 0)).toBe('empty');
+
+    expect(JSON.stringify(city)).toBe(before);
+  });
+
+  it('fails safely when the tile reference has no exact matching building', () => {
+    const city = createCityState();
+    expect(placeBuilding(city, 0, 0, 'road')).toBe('built');
+    const tile = getTile(city, 0, 0);
+    if (tile === undefined) throw new Error('Expected in-map tile.');
+    tile.buildingId = 'missing-building';
+    const before = JSON.stringify(city);
+
+    expect(demolishBuilding(city, 0, 0)).toBe('inconsistent-state');
+
+    expect(JSON.stringify(city)).toBe(before);
+  });
+
+  it('removes house population and workplace stock with their buildings only', () => {
+    const city = createCityState();
+    const house = city.buildings.find((building) => building.type === 'house');
+    const granary = city.buildings.find((building) => building.type === 'granary');
+    if (house === undefined || granary === undefined) throw new Error('Expected seeded house and granary.');
+    granary.storedFood = 37;
+    const populationBefore = getPopulation(city);
+
+    expect(demolishBuilding(city, house.x, house.y)).toBe('demolished');
+    expect(getPopulation(city)).toBe(populationBefore - (house.population ?? 0));
+    expect(demolishBuilding(city, granary.x, granary.y)).toBe('demolished');
+    expect(city.buildings).not.toContainEqual(expect.objectContaining({ id: granary.id }));
+    expect(getFoodStats(city).granaryFood).toBe(0);
+  });
+
+  it('makes road access derived state reflect a demolished road immediately', () => {
+    const city = createCityState();
+    const road = city.buildings.find((building) => building.type === 'road' && building.x === 5);
+    if (road === undefined) throw new Error('Expected endpoint of seeded road.');
+    const mainRoadTilesBefore = getRoadNetworkStats(city).mainRoadTiles;
+
+    expect(demolishBuilding(city, road.x, road.y)).toBe('demolished');
+
+    expect(getRoadNetworkStats(city).mainRoadTiles).toBe(mainRoadTilesBefore - 1);
   });
 });

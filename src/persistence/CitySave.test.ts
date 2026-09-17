@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fulfillImperialRequest } from '../events/Events';
-import { createCityState } from '../simulation/CityState';
+import { createCityState, demolishBuilding } from '../simulation/CityState';
 import { simulateTick } from '../simulation/Simulation';
 import {
   deserializeCityState,
@@ -52,6 +52,18 @@ describe('CitySave', () => {
     expect(result.city.buildings.find((building) => building.id === granary.id)?.storedFood).toBe(37);
     expect(result.city.buildings.find((building) => building.id === market.id)?.storedFood).toBe(11);
     expect(result.city.buildings.find((building) => building.type === 'farm')?.active).toBe(true);
+  });
+
+  it('round-trips a city after its active fire target is demolished', () => {
+    const city = createCityState();
+    for (let tick = 0; tick < 90; tick += 1) simulateTick(city);
+    const fire = city.simulation.events?.active.find((event) => event.type === 'fire');
+    const target = city.buildings.find((building) => building.id === fire?.targetBuildingId);
+    if (fire === undefined || target === undefined) throw new Error('Expected an active fire target.');
+
+    expect(demolishBuilding(city, target.x, target.y)).toBe('demolished');
+    expect(city.simulation.events?.active.find((event) => event.id === fire.id)?.targetBuildingId).toBeUndefined();
+    expect(deserializeCityState(serializeCityState(city))).toMatchObject({ ok: true, city });
   });
 
   it('loads an imperial request fulfilled before its deadline after the deadline', () => {

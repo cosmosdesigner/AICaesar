@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createCityState, type CityState } from '../simulation/CityState';
+import { createCityState, getTile, type CityState } from '../simulation/CityState';
 import type { LoadResult, SaveResult } from '../persistence/CitySave';
-import { getPopulationStats } from '../simulation/Simulation';
+import { getPopulationStats, getWorkforceStats } from '../simulation/Simulation';
 import { startGame } from './Game';
 
 type PointerHandler = (event: {
@@ -29,6 +29,7 @@ const doubles = vi.hoisted(() => ({
   clearInterval: vi.fn(),
   rendererResize: vi.fn(),
   appRender: vi.fn(),
+  selectedTool: 'road' as 'road' | 'bulldoze',
   stageHandlers: new Map<string, PointerHandler>(),
   windowHandlers: new Map<string, (event: KeyboardEvent) => void>(),
   canvasHandlers: new Map<string, (event: WheelEvent) => void>(),
@@ -39,7 +40,6 @@ const doubles = vi.hoisted(() => ({
     toLocal: ReturnType<typeof vi.fn>;
   }>,
   buildPanelInstances: [] as Array<{
-    selectedTool: 'road';
     update: ReturnType<typeof vi.fn>;
     onReset: () => void;
     onWaterOverlayToggle: () => boolean;
@@ -53,7 +53,7 @@ const doubles = vi.hoisted(() => ({
     onCenterMap: () => void;
   }>,
   advisorInstances: [] as Array<{
-    invalidateForCityLoad: object;
+    invalidateForCityChange: ReturnType<typeof vi.fn>;
   }>,
   saveLoadControlInstances: [] as Array<{
     onSave: () => { readonly ok: boolean; readonly message: string };
@@ -119,6 +119,7 @@ vi.mock('../rendering/MapRenderer', () => ({
 
 vi.mock('../ui/BuildPanel', () => ({
   BUILD_LABELS: {
+    bulldoze: 'Bulldoze',
     farm: 'Farm',
     fountain: 'Fountain',
     garden: 'Garden',
@@ -130,7 +131,9 @@ vi.mock('../ui/BuildPanel', () => ({
     well: 'Well',
   },
   BuildPanel: class BuildPanel {
-    selectedTool = 'road' as const;
+    get selectedTool(): 'road' | 'bulldoze' {
+      return doubles.selectedTool;
+    }
     update = vi.fn();
     destroy = doubles.buildPanelDestroy;
 
@@ -143,7 +146,6 @@ vi.mock('../ui/BuildPanel', () => ({
       onRoadNetworkOverlayToggle: () => boolean,
     ) {
       doubles.buildPanelInstances.push({
-        selectedTool: this.selectedTool,
         update: this.update,
         onReset,
         onWaterOverlayToggle,
@@ -194,7 +196,7 @@ vi.mock('../ui/SimulationControls', () => ({
 vi.mock('../ui/AdvisorPanel', () => ({
   AdvisorPanel: class AdvisorPanel {
     updateScenarioContext = vi.fn();
-    invalidateForCityLoad = vi.fn();
+    invalidateForCityChange = vi.fn();
     destroy = doubles.advisorDestroy;
 
     constructor() {
@@ -241,6 +243,7 @@ describe('startGame camera and cleanup', () => {
     doubles.saveLoadControlInstances.length = 0;
     doubles.persistenceSave.mockReturnValue({ ok: true, message: 'City saved locally.' });
     doubles.persistenceLoad.mockReturnValue({ ok: false, code: 'not_found', message: 'No local save was found.' });
+    doubles.selectedTool = 'road';
     doubles.resizeCallback = undefined;
     vi.stubGlobal('ResizeObserver', class ResizeObserver {
       constructor(callback: ResizeObserverCallback) {
@@ -302,7 +305,9 @@ describe('startGame camera and cleanup', () => {
     expect(doubles.persistenceSave).toHaveBeenLastCalledWith(initialCity);
     expect(controls.onLoad()).toMatchObject({ ok: true, message: 'City loaded locally.' });
     expect(doubles.persistenceLoad).toHaveBeenCalledOnce();
-    expect(doubles.advisorInstances[0]?.invalidateForCityLoad).toBeDefined();
+    expect(doubles.advisorInstances[0]?.invalidateForCityChange).toHaveBeenCalledWith(
+      'Advisor plan cleared after loading a different city.',
+    );
     expect(panel.update).toHaveBeenLastCalledWith(
       loadedCity,
       'City loaded locally.',
@@ -334,7 +339,7 @@ describe('startGame camera and cleanup', () => {
     expect(controls.onLoad()).toMatchObject({ ok: false, code: 'not_found' });
     expect(panel.update.mock.lastCall?.[0]).toBe(initialCity);
     expect(map.refresh).toHaveBeenCalledTimes(refreshCount);
-    expect(doubles.advisorInstances[0]?.invalidateForCityLoad).toBeDefined();
+    expect(doubles.advisorInstances[0]?.invalidateForCityChange).not.toHaveBeenCalled();
     cleanup();
   });
 
@@ -416,6 +421,94 @@ describe('startGame camera and cleanup', () => {
     expect(map.refresh).toHaveBeenLastCalledWith(expect.anything(), {
       waterOverlay: true, foodOverlay: true, desirabilityOverlay: true, roadNetworkOverlay: false,
     });
+    cleanup();
+  });
+
+  it('demolishes through the selected tool without advancing simulation or resetting session state', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    const target = city.buildings.find((building) => building.type === 'farm');
+    if (target === undefined) throw new Error('Expected seeded farm.');
+    const moneyBefore = city.resources.money;
+    const tickBefore = city.simulation.tick;
+    const buildingCountBefore = city.buildings.length;
+    const workersRequiredBefore = getWorkforceStats(city).workersRequired;
+    map.toLocal.mockImplementation((_global, _container, out) => {
+      out.x = (target.x - target.y) * 60;
+      out.y = (target.x + target.y) * 30;
+      return out;
+    });
+    expect(panel.onWaterOverlayToggle()).toBe(true);
+    expect(panel.onFoodOverlayToggle()).toBe(true);
+    expect(panel.onDesirabilityOverlayToggle()).toBe(true);
+    expect(panel.onRoadNetworkOverlayToggle()).toBe(true);
+    doubles.selectedTool = 'bulldoze';
+
+    doubles.stageHandlers.get('pointerdown')?.({
+      button: 0,
+      global: { x: 320, y: 180 },
+      preventDefault: vi.fn(),
+    });
+
+    expect(city.buildings).toHaveLength(buildingCountBefore - 1);
+    expect(getTile(city, target.x, target.y)?.buildingId).toBeUndefined();
+    expect(city.resources.money).toBe(moneyBefore);
+    expect(city.simulation.tick).toBe(tickBefore);
+    expect(getWorkforceStats(city).workersRequired).toBe(workersRequiredBefore - 6);
+    expect(doubles.persistenceSave).not.toHaveBeenCalled();
+    expect(doubles.advisorInstances[0]?.invalidateForCityChange).toHaveBeenCalledWith(
+      'Advisor plan cleared after demolition.',
+    );
+    expect(map.refresh).toHaveBeenLastCalledWith(city, {
+      waterOverlay: true, foodOverlay: true, desirabilityOverlay: true, roadNetworkOverlay: true,
+    });
+    expect(map.fitCamera).toHaveBeenCalledOnce();
+    cleanup();
+  });
+
+  it('blocks bulldoze without mutating a terminal scenario', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    const target = city.buildings.find((building) => building.type === 'road');
+    if (target === undefined) throw new Error('Expected seeded road.');
+    city.resources.money = 0;
+    const before = JSON.stringify(city);
+    map.toLocal.mockImplementation((_global, _container, out) => {
+      out.x = (target.x - target.y) * 60;
+      out.y = (target.x + target.y) * 30;
+      return out;
+    });
+    doubles.selectedTool = 'bulldoze';
+
+    doubles.stageHandlers.get('pointerdown')?.({
+      button: 0,
+      global: { x: 320, y: 180 },
+      preventDefault: vi.fn(),
+    });
+
+    expect(JSON.stringify(city)).toBe(before);
+    expect(doubles.advisorInstances[0]?.invalidateForCityChange).not.toHaveBeenCalled();
+    expect(panel.update).toHaveBeenLastCalledWith(
+      city,
+      'Defeat: the settlement treasury fell below 50.',
+      false,
+      false,
+      false,
+      false,
+      { buildBlocked: true },
+    );
     cleanup();
   });
 

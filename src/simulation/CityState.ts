@@ -1,6 +1,6 @@
 import { getHouseSpecification } from './HouseSpecification';
 import type { BuildingType, Tile } from './Tile';
-import { createEventState, type EventState } from '../events/Events';
+import { clearBuildingEventTarget, createEventState, type EventState } from '../events/Events';
 
 export const MAP_WIDTH = 30;
 export const MAP_HEIGHT = 30;
@@ -128,6 +128,34 @@ export function placeBuilding(city: CityState, x: number, y: number, type: Build
   addBuilding(city, x, y, type);
   city.resources.money -= cost;
   return 'built';
+}
+
+export type DemolishResult = 'demolished' | 'outside-map' | 'empty' | 'inconsistent-state';
+
+export function demolishBuilding(city: CityState, x: number, y: number): DemolishResult {
+  const tile = getTile(city, x, y);
+  if (!tile) return 'outside-map';
+  if (tile.buildingId === undefined) return 'empty';
+
+  let buildingIndex = -1;
+  for (let index = 0; index < city.buildings.length; index += 1) {
+    if (city.buildings[index]?.id !== tile.buildingId) continue;
+    if (buildingIndex !== -1) return 'inconsistent-state';
+    buildingIndex = index;
+  }
+  const building = city.buildings[buildingIndex];
+  if (
+    building === undefined
+    || building.x !== tile.x
+    || building.y !== tile.y
+  ) {
+    return 'inconsistent-state';
+  }
+
+  delete tile.buildingId;
+  city.buildings.splice(buildingIndex, 1);
+  clearBuildingEventTarget(city, building.id);
+  return 'demolished';
 }
 
 function getSeedBuildingType(x: number, y: number): BuildingType | undefined {
