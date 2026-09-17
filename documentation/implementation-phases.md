@@ -1089,13 +1089,8 @@ Regra prática:
 
 ## 34. Próximo passo recomendado
 
-A próxima fase a implementar deve ser a Fase 13: loop de jogo e objetivos de cenário.
+As fases 13–28 foram implementadas como base jogável. O roadmap de releases orientado a valor está em [`documentation/next-releases-roadmap.md`](next-releases-roadmap.md).
 
-Motivo:
+A próxima fase concreta deve ser a Fase 29: tornar a primeira cidade compreensível, com onboarding curto, objectivo actual destacado e feedback claro sobre mudanças e próximo problema.
 
-- sem objetivo, o protótipo continua sandbox;
-- com objetivo, todas as mecânicas existentes passam a ter propósito;
-- dá uma base clara para balanceamento, economia, advisor e eventos;
-- é o menor passo que transforma a demo num jogo.
-
-Não recomendo começar já por LLM real, walkers complexos ou mais edifícios. Isso aumentaria complexidade antes de existir um loop jogável validado.
+Não recomendo começar já por LLM real, walkers complexos ou mais edifícios. O risco principal é de experiência: adicionar tecnologia sem aumentar a clareza das decisões ou a vontade de continuar a jogar.
