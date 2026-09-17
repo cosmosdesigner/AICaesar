@@ -17,6 +17,7 @@ export type TouchGestureUpdate =
   | {
     readonly type: 'pinch';
     readonly midpoint: TouchPoint;
+    readonly delta: TouchPoint;
     readonly scale: number;
   };
 
@@ -60,9 +61,14 @@ export class TouchGestureRecognizer {
     const currentPinch = this.getPinchPoints();
     if (previousPinch !== undefined && currentPinch !== undefined) {
       this.kind = 'pinch';
+      const currentMidpoint = midpoint(currentPinch.first, currentPinch.second);
       return {
         type: 'pinch',
-        midpoint: midpoint(currentPinch.first, currentPinch.second),
+        midpoint: currentMidpoint,
+        delta: {
+          x: currentMidpoint.x - (previousPinch.first.x + previousPinch.second.x) / 2,
+          y: currentMidpoint.y - (previousPinch.first.y + previousPinch.second.y) / 2,
+        },
         scale: distance(currentPinch.first, currentPinch.second) / distanceOrOne(previousPinch.first, previousPinch.second),
       };
     }

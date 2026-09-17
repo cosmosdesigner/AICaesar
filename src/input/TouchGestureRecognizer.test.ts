@@ -28,21 +28,31 @@ describe('TouchGestureRecognizer', () => {
     });
   });
 
-  it('cancels tap and drag for pinch with incremental midpoint scale', () => {
+  it('cancels tap and drag for pinch with incremental midpoint deltas and scale', () => {
     const gestures = new TouchGestureRecognizer();
 
     gestures.pointerDown(1, { x: 0, y: 0 });
     gestures.pointerDown(2, { x: 10, y: 0 });
     expect(gestures.pointerMove(2, { x: 20, y: 0 })).toEqual({
-      type: 'pinch', midpoint: { x: 10, y: 0 }, scale: 2,
+      type: 'pinch', midpoint: { x: 10, y: 0 }, delta: { x: 5, y: 0 }, scale: 2,
     });
     expect(gestures.pointerMove(1, { x: 5, y: 0 })).toEqual({
-      type: 'pinch', midpoint: { x: 12.5, y: 0 }, scale: 0.75,
+      type: 'pinch', midpoint: { x: 12.5, y: 0 }, delta: { x: 2.5, y: 0 }, scale: 0.75,
     });
     expect(gestures.pointerUp(2, { x: 20, y: 0 })).toEqual({ type: 'none' });
     expect(gestures.isActive).toBe(false);
     expect(gestures.pointerUp(1, { x: 5, y: 0 })).toEqual({ type: 'none' });
     expect(gestures.isActive).toBe(false);
+  });
+
+  it('reports scale one for a two-finger midpoint pan', () => {
+    const gestures = new TouchGestureRecognizer();
+
+    gestures.pointerDown(1, { x: 0, y: 0 });
+    gestures.pointerDown(2, { x: 10, y: 0 });
+    expect(gestures.pointerMove(1, { x: 20, y: 0 })).toEqual({
+      type: 'pinch', midpoint: { x: 15, y: 0 }, delta: { x: 10, y: 0 }, scale: 1,
+    });
   });
 
   it('clears active gestures for cancellation and outside release', () => {

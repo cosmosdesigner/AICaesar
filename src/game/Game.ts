@@ -306,7 +306,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     if (gesture.type === 'tap') {
       applySingleToolAtPoint(gesture.point);
     } else if (gesture.type === 'pinch') {
-      zoomAt(gesture.midpoint, gesture.scale);
+      applyCamera(zoomAtScreenPoint(panCamera(camera, gesture.delta), gesture.midpoint, camera.zoom * gesture.scale));
     } else if (gesture.type === 'drag') {
       if (panel.selectedTool === 'road' || panel.selectedTool === 'bulldoze') {
         applyTraceAtPoint(gesture.point);

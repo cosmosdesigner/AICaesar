@@ -995,7 +995,30 @@ describe('startGame camera and cleanup', () => {
     cleanup();
   });
 
-  it('pinches around the midpoint without changing city tiles and clears cancelled gestures', async () => {
+  it('pans with two touch pointers at unchanged distance without changing city tiles', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    const buildingCount = city.buildings.length;
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, { x: 100, y: 100 }));
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(2, { x: 110, y: 100 }));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, { x: 120, y: 100 }));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(2, { x: 110, y: 100 }));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(1, { x: 120, y: 100 }));
+
+    expect(city.buildings).toHaveLength(buildingCount);
+    expect(map.toLocal).not.toHaveBeenCalled();
+    expect(map.applyCamera).toHaveBeenLastCalledWith({ x: 110, y: 50, zoom: 0.5 });
+    cleanup();
+  });
+
+  it('pans then pinches around the midpoint without changing city tiles and clears cancelled gestures', async () => {
     const cleanup = await startGame(
       { clientWidth: 800, clientHeight: 600 } as HTMLElement,
       {} as HTMLElement,
@@ -1014,7 +1037,7 @@ describe('startGame camera and cleanup', () => {
 
     expect(city.buildings).toHaveLength(buildingCount);
     expect(map.toLocal).not.toHaveBeenCalled();
-    expect(map.applyCamera).toHaveBeenLastCalledWith({ x: 90, y: 0, zoom: 1 });
+    expect(map.applyCamera).toHaveBeenLastCalledWith({ x: 100, y: 0, zoom: 1 });
 
     doubles.stageHandlers.get('pointerdown')?.(touchEvent(3, gridPoint(22, 10)));
     doubles.stageHandlers.get('pointercancel')?.(touchEvent(3, gridPoint(22, 10)));
