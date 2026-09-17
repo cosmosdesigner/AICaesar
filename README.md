@@ -206,6 +206,7 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 - [Plano da Fase 26](documentation/phase-26-development-plan.md)
 - [Plano da Fase 27](documentation/phase-27-development-plan.md)
 - [Plano da Fase 28](documentation/phase-28-development-plan.md)
+- [Plano da Fase 29 — Governor Command Center](documentation/phase-29-development-plan.md)
 - [Roadmap das próximas releases](documentation/next-releases-roadmap.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)
