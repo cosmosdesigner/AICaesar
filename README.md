@@ -198,5 +198,6 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 - [Plano da Fase 22](documentation/phase-22-development-plan.md)
 - [Plano da Fase 23](documentation/phase-23-development-plan.md)
 - [Plano da Fase 24](documentation/phase-24-development-plan.md)
+- [Plano da Fase 25](documentation/phase-25-development-plan.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)
