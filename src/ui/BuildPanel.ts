@@ -99,6 +99,8 @@ export class BuildPanel {
   private readonly roadNetworkOverlay = document.createElement('button');
   private readonly desirabilityOverlay = document.createElement('button');
   private readonly status = document.createElement('p');
+  private readonly tilePreview = document.createElement('p');
+
 
   constructor(
     host: HTMLElement,
@@ -107,6 +109,7 @@ export class BuildPanel {
     onFoodOverlayToggle: () => boolean,
     onDesirabilityOverlayToggle: () => boolean,
     onRoadNetworkOverlayToggle: () => boolean,
+    onToolChange: () => void = () => undefined,
   ) {
     this.element.className = 'build-panel';
     this.element.setAttribute('aria-label', 'Construção manual');
@@ -138,6 +141,7 @@ export class BuildPanel {
         this.status.textContent = tool === 'bulldoze'
           ? 'Clique num edifício ou estrada para demolir.'
           : 'Clique num tile vazio para construir.';
+        onToolChange();
       });
       this.toolButtons.push(button);
       tools.append(button);
@@ -266,6 +270,8 @@ export class BuildPanel {
     reset.addEventListener('click', onReset);
     this.status.className = 'build-status';
     this.status.setAttribute('role', 'status');
+    this.tilePreview.className = 'tile-preview';
+    this.tilePreview.setAttribute('role', 'status');
     this.element.append(
       balance,
       selected,
@@ -280,6 +286,7 @@ export class BuildPanel {
       this.roadNetworkOverlay,
       this.issues,
       reset,
+      this.tilePreview,
       this.status,
     );
     host.append(this.element);
@@ -366,6 +373,10 @@ export class BuildPanel {
       }
     }
     this.status.textContent = message;
+  }
+
+  setPreviewStatus(description: string): void {
+    this.tilePreview.textContent = description;
   }
 
   destroy(): void {

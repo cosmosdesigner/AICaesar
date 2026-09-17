@@ -36,6 +36,12 @@ import { SaveLoadControls } from '../ui/SaveLoadControls';
 import { getSimulationIntervalMs, type SimulationSpeed } from './SimulationSpeed';
 import { createSessionMetrics, recordSessionMetric, refreshSessionMetrics } from './SessionMetrics';
 import { TouchGestureRecognizer, type TouchGestureUpdate } from '../input/TouchGestureRecognizer';
+import {
+  describeTilePreview,
+  getTilePreview,
+  type TilePreview,
+} from './TilePreview';
+
 export async function startGame(host: HTMLElement, panelHost: HTMLElement): Promise<() => void> {
   const ZOOM_STEP = 1.1;
   let selectedScenarioId: ScenarioId = FOUNDING_SETTLEMENT_SCENARIO.id;
@@ -70,6 +76,9 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     () => toggleOverlay('food'),
     () => toggleOverlay('desirability'),
     () => toggleOverlay('road-network'),
+    () => {
+      if (preview !== null) setPreview(preview);
+    },
   );
   const cameraControls = new CameraControls(
     panelHost,
@@ -149,6 +158,8 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     'outside-map': 'Demola dentro do mapa.', empty: 'Não há edifício ou estrada neste tile.', 'inconsistent-state': 'Demolição bloqueada: os dados do edifício são inconsistentes.',
   };
   const local = new Point();
+  let preview: TilePreview | null = null;
+
   app.stage.eventMode = 'static';
   app.stage.hitArea = app.screen;
   updateCursor();
@@ -157,6 +168,8 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   app.stage.on('pointerup', handlePointerUp);
   app.stage.on('pointerupoutside', handlePointerUpOutside);
   app.stage.on('pointercancel', handlePointerCancel);
+  app.stage.on('pointerout', handlePointerOut);
+
   app.canvas.addEventListener('wheel', handleWheel, { passive: false });
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('keyup', handleKeyUp);
@@ -191,6 +204,8 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
 
   function refreshCity(message: string): void {
     map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
+    syncPreview();
+
     const scenarioProgress = evaluateScenario(city, activeScenario);
     const request = city.simulation.events?.pendingRequest;
     if (request?.status === 'failed' && !failedRequestIds.has(request.id)) {
@@ -243,6 +258,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   }
 
   function handlePointerDown(event: FederatedPointerEvent): void {
+    clearPreview();
     if (event.pointerType === 'touch') {
       event.preventDefault();
       touchGesture.pointerDown(event.pointerId, event.global);
@@ -265,17 +281,28 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   function handlePointerMove(event: FederatedPointerEvent): void {
     if (event.pointerType === 'touch') {
       event.preventDefault();
-      applyTouchGesture(touchGesture.pointerMove(event.pointerId, event.global));
+      const gesture = touchGesture.pointerMove(event.pointerId, event.global);
+      if (gesture.type === 'none' && touchGesture.isActive && !touchGesture.isPinching) {
+        updatePreviewAtPoint(event.global);
+      } else {
+        clearPreview();
+      }
+      applyTouchGesture(gesture);
       return;
     }
 
-    if (!isPanning || lastPanPoint === undefined) return;
+    if (!isPanning || lastPanPoint === undefined) {
+      updatePreviewAtPoint(event.global);
+      return;
+    }
+    clearPreview();
     const point = { x: event.global.x, y: event.global.y };
     applyCamera(panCamera(camera, { x: point.x - lastPanPoint.x, y: point.y - lastPanPoint.y }));
     lastPanPoint = point;
   }
 
   function handlePointerUp(event: FederatedPointerEvent): void {
+    clearPreview();
     if (event.pointerType !== 'touch') {
       stopPan();
       return;
@@ -288,6 +315,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   }
 
   function handlePointerUpOutside(event: FederatedPointerEvent): void {
+    clearPreview();
     if (event.pointerType !== 'touch') {
       stopPan();
       return;
@@ -298,9 +326,14 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   }
 
   function handlePointerCancel(event: FederatedPointerEvent): void {
+    clearPreview();
     if (event.pointerType !== 'touch') return;
     event.preventDefault();
     cancelTouchGesture();
+  }
+
+  function handlePointerOut(): void {
+    clearPreview();
   }
   function applyTouchGesture(gesture: TouchGestureUpdate): void {
     if (gesture.type === 'tap') {
@@ -320,6 +353,30 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   function cancelTouchGesture(): void {
     touchGesture.cancel();
     tracedTileKeys.clear();
+    clearPreview();
+  }
+
+  function updatePreviewAtPoint(screenPoint: { readonly x: number; readonly y: number }): void {
+    map.toLocal(screenPoint, undefined, local);
+    setPreview(getTilePreview(city, screenToGrid(local.x, local.y)));
+  }
+
+  function setPreview(nextPreview: TilePreview | null, render = true): void {
+    preview = nextPreview;
+    map.setPreview(preview);
+    panel.setPreviewStatus(describeTilePreview(preview, panel.selectedTool === 'bulldoze' ? 'demolish' : 'build'));
+    if (render) app.render();
+  }
+
+  function syncPreview(): void {
+    if (preview !== null) setPreview(getTilePreview(city, preview), false);
+  }
+
+  function clearPreview(): void {
+    preview = null;
+    map.setPreview(null);
+    panel.setPreviewStatus('');
+    app.render();
   }
 
   function applySingleToolAtPoint(screenPoint: { readonly x: number; readonly y: number }): void {
@@ -410,6 +467,8 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   scheduleTick();
 
   return () => {
+    clearPreview();
+
     cancelTouchGesture();
     if (tickHandle !== undefined) window.clearInterval(tickHandle);
     observer.disconnect();

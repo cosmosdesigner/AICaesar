@@ -1,5 +1,6 @@
 import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import type { MapTextures } from '../assets/AssetManifest';
+import type { TilePreview } from '../game/TilePreview';
 import type { Building, CityState } from '../simulation/CityState';
 import { getDesirabilityOverlayTiles } from '../simulation/Desirability';
 import { getRoadNetwork } from '../simulation/RoadNetwork';
@@ -8,6 +9,9 @@ import { createFittedCamera, type CameraState } from './Camera';
 import { gridToScreen, TILE_HEIGHT, TILE_WIDTH } from './GridMath';
 
 export class MapRenderer extends Container {
+  private preview: TilePreview | null = null;
+  private previewLayer: Graphics | undefined;
+
   constructor(city: CityState, private readonly textures: MapTextures) {
     super();
     this.eventMode = 'none';
@@ -23,7 +27,9 @@ export class MapRenderer extends Container {
     const terrain = new Container();
     const overlays = new Container();
     const buildings = new Container();
-    this.addChild(terrain, overlays, buildings);
+    const preview = new Graphics();
+    this.previewLayer = preview;
+    this.addChild(terrain, overlays, buildings, preview);
 
     for (const tile of city.tiles) {
       terrain.addChild(this.createTileSprite(tile, this.textures[tile.terrain]));
@@ -74,6 +80,8 @@ export class MapRenderer extends Container {
       }
       buildings.addChild(sprite);
     }
+    this.drawPreview();
+
   }
 
   applyCamera(camera: CameraState): void {
@@ -97,6 +105,24 @@ export class MapRenderer extends Container {
 
   fit(width: number, height: number): void {
     this.fitCamera(width, height);
+  }
+
+  setPreview(preview: TilePreview | null): void {
+    this.preview = preview;
+    this.drawPreview();
+  }
+
+  private drawPreview(): void {
+    if (this.previewLayer === undefined) return;
+    this.previewLayer.clear();
+    if (this.preview === null) return;
+    this.drawCoverageTile(
+      this.previewLayer,
+      this.preview.x,
+      this.preview.y,
+      this.preview.state === 'free' ? 0x65b84a : 0xe87542,
+      0.42,
+    );
   }
 
   private drawCoverageTile(graphics: Graphics, x: number, y: number, color: number, alpha: number): void {

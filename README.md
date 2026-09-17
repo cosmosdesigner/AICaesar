@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 25 — cenários, dificuldade e métricas de sessão**: mapa isométrico 30×30, construção e demolição manual de roads/houses/wells/farms/granaries/markets e amenities garden/plaza/fountain, rede principal e serviços por distância BFS em estradas, desirability local determinística, população, workers, finanças, eventos temporários determinísticos, pedidos do imperador, três cenários determinísticos com perfis Easy/Normal, advisor mock local estratégico com planos multi-ação, after-action promise-vs-result, métricas locais de sessão, overlays de água/comida/rede viária/desirability e save/load local v1.
+**Fase 28 — feedback de preview do tile**: mapa isométrico 30×30, construção e demolição manual de roads/houses/wells/farms/granaries/markets e amenities garden/plaza/fountain, navegação desktop e touch com pan/pinch, preview efémero do tile livre/ocupado, rede principal e serviços por distância BFS em estradas, desirability local determinística, população, workers, finanças, eventos temporários determinísticos, pedidos do imperador, três cenários determinísticos com perfis Easy/Normal, advisor mock local estratégico com planos multi-ação, after-action promise-vs-result, métricas locais de sessão, overlays de água/comida/rede viária/desirability e save/load local v1.
 
 ## Executar localmente
 
@@ -46,7 +46,7 @@ npm run preview
 - O painel Advisor tem botão **Analyze city**; gera um `AdvisorPlan` de forma assíncrona via `AdvisorProvider`, mostra contexto determinístico do cenário sem enviar trabalho extra ao provider, mostra o provider usado (`mock` por defeito local, ou fallback quando configurado) e apresenta resumo, raciocínio, ações, custo estimado, impactos esperados e riscos. **Approve** valida orçamento aprovado, dinheiro, tipo, target, limites do mapa, ocupação e custo antes de executar builds via `placeBuilding`; quando a execução é bem-sucedida, mostra um after-action report com ações executadas, gasto, deltas de métricas reais e até 3 problemas remanescentes. **wait** é no-op válido; **Reject** limpa o plano. Com vitória/derrota, aprovação fica bloqueada até **Reset**.
 - Sprites reais da Caesaria, alinhados pela base do tile e ordenados de trás para a frente; casas nível 2 recebem tint clara e nível 3 tint verde. Garden, plaza e fountain reutilizam temporariamente sprites de farm, market e well, respetivamente, com tint verde/dourado/azul.
 - Câmara centrada/enquadrada no arranque e em **Reset**; redimensionamento, construção, overlays, ticks e advisor preservam pan/zoom atuais.
-- Painel **Map navigation** com **Zoom in**, **Zoom out** e **Center map**, tooltips e ajuda curta: `Pan: middle-drag or Space + left-drag`; `Zoom: mouse wheel or controls`. O zoom da câmara é limitado a **2x** para não ampliar em excesso os sprites temporários de baixa resolução.
+- Painel **Map navigation** com **Zoom in**, **Zoom out** e **Center map**, tooltips e ajuda curta: `Pan: middle-drag or Space + left-drag`; `Touch: one-finger pan, two-finger pan/pinch`; `Zoom: mouse wheel or controls`. O zoom da câmara é limitado a **2x** para não ampliar em excesso os sprites temporários de baixa resolução.
 - O painel **Session metrics** mostra cenário/dificuldade, estado, tick, pico de população, menor tesouraria, construções/demolições bem-sucedidas, planos aprovados/rejeitados e pedidos imperiais cumpridos/falhados. É estado local da sessão: reset ou troca de seleção recria e limpa as métricas; edifícios seedados e operações rejeitadas não contam.
 
 
@@ -203,5 +203,8 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 - [Plano da Fase 24](documentation/phase-24-development-plan.md)
 - [Plano da Fase 25](documentation/phase-25-development-plan.md)
 - [Checklist de playtest da Fase 25](documentation/phase-25-playtest-checklist.md)
+- [Plano da Fase 26](documentation/phase-26-development-plan.md)
+- [Plano da Fase 27](documentation/phase-27-development-plan.md)
+- [Plano da Fase 28](documentation/phase-28-development-plan.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)

@@ -1,4 +1,4 @@
-import { Container, Sprite, Texture } from 'pixi.js';
+import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { describe, expect, it } from 'vitest';
 import type { MapTextures } from '../assets/AssetManifest';
 import { createCityState, placeBuilding } from '../simulation/CityState';
@@ -77,6 +77,32 @@ describe('road network rendering', () => {
     expect(map.getCameraState()).toEqual(camera);
     map.refresh(city, { roadNetworkOverlay: false });
     expect(map.getCameraState()).toEqual(camera);
+    map.destroy({ children: true });
+  });
+});
+
+describe('tile preview rendering', () => {
+  it('renders ephemeral free and occupied highlights without changing the city or camera', () => {
+    const city = createRoadCity();
+    const map = new MapRenderer(city, textures);
+    const camera = { x: -215, y: 137, zoom: 1.6 };
+    const before = JSON.stringify(city);
+    map.applyCamera(camera);
+
+    map.setPreview({ x: 3, y: 3, state: 'free' });
+    const preview = map.children[3];
+    expect(preview).toBeInstanceOf(Graphics);
+    if (!(preview instanceof Graphics)) throw new Error('Expected preview graphics layer.');
+    expect(preview.getLocalBounds().width).toBeGreaterThan(0);
+
+    map.setPreview({ x: 1, y: 1, state: 'occupied', buildingType: 'road' });
+    map.refresh(city);
+    const refreshedPreview = map.children[3];
+    expect(refreshedPreview).toBeInstanceOf(Graphics);
+    if (!(refreshedPreview instanceof Graphics)) throw new Error('Expected refreshed preview graphics layer.');
+    expect(refreshedPreview.getLocalBounds().width).toBeGreaterThan(0);
+    expect(map.getCameraState()).toEqual(camera);
+    expect(JSON.stringify(city)).toBe(before);
     map.destroy({ children: true });
   });
 });

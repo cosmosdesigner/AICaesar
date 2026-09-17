@@ -51,10 +51,12 @@ const doubles = vi.hoisted(() => ({
     refresh: ReturnType<typeof vi.fn>;
     applyCamera: ReturnType<typeof vi.fn>;
     fitCamera: ReturnType<typeof vi.fn>;
+    setPreview: ReturnType<typeof vi.fn>;
     toLocal: ReturnType<typeof vi.fn>;
   }>,
   buildPanelInstances: [] as Array<{
     update: ReturnType<typeof vi.fn>;
+    setPreviewStatus: ReturnType<typeof vi.fn>;
     onReset: () => void;
     onWaterOverlayToggle: () => boolean;
     onFoodOverlayToggle: () => boolean;
@@ -119,6 +121,8 @@ vi.mock('../rendering/MapRenderer', () => ({
     refresh = vi.fn();
     applyCamera = vi.fn();
     fitCamera = vi.fn(() => ({ x: 100, y: 50, zoom: 0.5 }));
+    setPreview = vi.fn();
+
     toLocal = vi.fn((_global, _container, out) => {
       out.x = 15;
       out.y = 30;
@@ -149,6 +153,7 @@ vi.mock('../ui/BuildPanel', () => ({
       return doubles.selectedTool;
     }
     update = vi.fn();
+    setPreviewStatus = vi.fn();
     destroy = doubles.buildPanelDestroy;
 
     constructor(
@@ -161,6 +166,7 @@ vi.mock('../ui/BuildPanel', () => ({
     ) {
       doubles.buildPanelInstances.push({
         update: this.update,
+        setPreviewStatus: this.setPreviewStatus,
         onReset,
         onWaterOverlayToggle,
         onFoodOverlayToggle,
@@ -741,6 +747,79 @@ describe('startGame camera and cleanup', () => {
     expect(map.toLocal).toHaveBeenCalled();
     expect(map.refresh).toHaveBeenCalled();
     expect(map.fitCamera).toHaveBeenCalledOnce();
+  });
+
+  it('derives desktop hover feedback without changing city state and clears it for navigation', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    map.toLocal.mockImplementation((global, _container, out) => {
+      out.x = global.x;
+      out.y = global.y;
+      return out;
+    });
+    const point = gridPoint(20, 10);
+    const before = JSON.stringify(city);
+
+    doubles.stageHandlers.get('pointermove')?.({ button: 0, global: point, preventDefault: vi.fn() });
+    expect(map.setPreview).toHaveBeenLastCalledWith({ x: 20, y: 10, state: 'free' });
+    expect(panel.setPreviewStatus).toHaveBeenLastCalledWith('Tile (20, 10): livre — construir.');
+    expect(JSON.stringify(city)).toBe(before);
+
+    expect(placeBuilding(city, 20, 10, 'well')).toBe('built');
+    doubles.selectedTool = 'bulldoze';
+    doubles.stageHandlers.get('pointermove')?.({ button: 0, global: point, preventDefault: vi.fn() });
+    expect(map.setPreview).toHaveBeenLastCalledWith({ x: 20, y: 10, state: 'occupied', buildingType: 'well' });
+    expect(panel.setPreviewStatus).toHaveBeenLastCalledWith('Tile (20, 10): ocupado por Well — demolir.');
+
+    doubles.stageHandlers.get('pointermove')?.({ button: 0, global: gridPoint(30, 10), preventDefault: vi.fn() });
+    expect(map.setPreview).toHaveBeenLastCalledWith(null);
+    expect(panel.setPreviewStatus).toHaveBeenLastCalledWith('Tile: fora do mapa.');
+
+    doubles.stageHandlers.get('pointerdown')?.({ button: 1, global: point, preventDefault: vi.fn() });
+    expect(map.setPreview).toHaveBeenLastCalledWith(null);
+    expect(panel.setPreviewStatus).toHaveBeenLastCalledWith('');
+    cleanup();
+    expect(map.setPreview).toHaveBeenLastCalledWith(null);
+  });
+
+  it('clears preview for pan, pinch, cancellation, and game cleanup', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const map = getMapRendererDouble();
+    map.toLocal.mockImplementation((global, _container, out) => {
+      out.x = global.x;
+      out.y = global.y;
+      return out;
+    });
+    const point = gridPoint(20, 10);
+
+    doubles.stageHandlers.get('pointermove')?.({ button: 0, global: point, preventDefault: vi.fn() });
+    doubles.stageHandlers.get('pointerdown')?.({ button: 1, global: point, preventDefault: vi.fn() });
+    expect(map.setPreview).toHaveBeenLastCalledWith(null);
+
+    doubles.stageHandlers.get('pointerup')?.({ button: 1, global: point, preventDefault: vi.fn() });
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, point));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, { x: point.x + 1, y: point.y }));
+    expect(map.setPreview).toHaveBeenLastCalledWith({ x: 20, y: 10, state: 'free' });
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(2, { x: point.x + 10, y: point.y }));
+    expect(map.setPreview).toHaveBeenLastCalledWith(null);
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(2, { x: point.x + 20, y: point.y }));
+    expect(map.setPreview).toHaveBeenLastCalledWith(null);
+
+    doubles.stageHandlers.get('pointercancel')?.(touchEvent(2, { x: point.x + 20, y: point.y }));
+    expect(map.setPreview).toHaveBeenLastCalledWith(null);
+    doubles.stageHandlers.get('pointermove')?.({ button: 0, global: point, preventDefault: vi.fn() });
+    cleanup();
+    expect(map.setPreview).toHaveBeenLastCalledWith(null);
   });
   it('keeps touch taps as single Road construction and Bulldoze demolition', async () => {
     const cleanup = await startGame(

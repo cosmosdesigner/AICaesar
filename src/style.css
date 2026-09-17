@@ -159,6 +159,7 @@ button:hover { background: #365440; }
 button[aria-pressed="true"] { color: #182522; background: #d6c18b; border-color: #d6c18b; }
 button:focus-visible { outline: 2px solid #f2d690; outline-offset: 3px; }
 .build-status,
+.tile-preview,
 .save-load-status { flex-basis: 100%; min-height: 1.5em; color: #d6c18b; }
 #map {
   position: relative;
