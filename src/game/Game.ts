@@ -1,6 +1,6 @@
 import { type FederatedPointerEvent, Point } from 'pixi.js';
 import { approveAdvisorPlan } from '../advisor/AdvisorApproval';
-import { loadMapTextures } from '../assets/AssetManifest';
+import { loadMapTextures, loadVisualActivityTextures } from '../assets/AssetManifest';
 import { screenToGrid } from '../rendering/GridMath';
 import { MapRenderer } from '../rendering/MapRenderer';
 import { panCamera, zoomAtScreenPoint, type CameraState } from '../rendering/Camera';
@@ -68,9 +68,17 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   const agora = new AgoraPanel(panelHost);
   const buildHost = createCollapsiblePanelHost(panelHost, 'Construção', true);
   let advisor: AdvisorPanel | undefined;
-  const textures = await loadMapTextures();
+  const [textures, activityTextures] = await Promise.all([
+    loadMapTextures(),
+    loadVisualActivityTextures().catch(() => undefined),
+  ]);
   const app = await createPixiApp(host);
-  const map = new MapRenderer(city, textures);
+  const map = new MapRenderer(city, textures, activityTextures);
+  const visualActivityTicker = (ticker: { readonly deltaMS: number }): void => {
+    if (!paused) map.updateVisualActivity(ticker.deltaMS / 1_000);
+  };
+  app.ticker.add(visualActivityTicker);
+  app.ticker.start();
   app.stage.addChild(map);
   let camera: CameraState = map.fitCamera(app.screen.width, app.screen.height);
   const panel = new BuildPanel(
@@ -148,6 +156,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       const result = loadCityState();
       if (result.ok) {
         city = result.city;
+        map.resetVisualActivity(city);
         advisor?.invalidateForCityChange('Advisor plan cleared after loading a different city.');
         refreshCity(result.message);
       }
@@ -192,6 +201,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     metrics = createSessionMetrics(city, selectedScenarioId, selectedDifficulty, evaluateScenario(city, activeScenario));
     advisor?.invalidateForCityChange('Advisor plan and report cleared for a fresh city.');
     scenarioPanel.setDefinition(activeScenario);
+    map.resetVisualActivity(city);
     refreshCity(message);
     centerCamera();
   }
@@ -476,6 +486,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
 
     cancelTouchGesture();
     if (tickHandle !== undefined) window.clearInterval(tickHandle);
+    app.ticker.remove(visualActivityTicker);
     observer.disconnect();
     app.canvas.removeEventListener('wheel', handleWheel);
     window.removeEventListener('keydown', handleKeyDown);

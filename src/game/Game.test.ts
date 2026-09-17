@@ -33,6 +33,7 @@ const doubles = vi.hoisted(() => ({
     update: Mock;
   }>,
   simulationControlsDestroy: vi.fn(),
+  simulationControlInstances: [] as Array<{ onTogglePause: () => boolean }>,
   advisorDestroy: vi.fn(),
   saveLoadControlsDestroy: vi.fn(),
   persistenceSave: vi.fn<() => SaveResult>(() => ({ ok: true, message: 'City saved locally.' })),
@@ -46,15 +47,18 @@ const doubles = vi.hoisted(() => ({
   rendererResize: vi.fn(),
   appRender: vi.fn(),
   selectedTool: 'road' as BuildTool,
+  visualActivityTicker: undefined as ((ticker: { readonly deltaMS: number }) => void) | undefined,
   stageHandlers: new Map<string, PointerHandler>(),
   windowHandlers: new Map<string, (event: KeyboardEvent) => void>(),
   canvasHandlers: new Map<string, (event: WheelEvent) => void>(),
   mapInstances: [] as Array<{
-    refresh: ReturnType<typeof vi.fn>;
-    applyCamera: ReturnType<typeof vi.fn>;
-    fitCamera: ReturnType<typeof vi.fn>;
-    setPreview: ReturnType<typeof vi.fn>;
-    toLocal: ReturnType<typeof vi.fn>;
+    refresh: Mock;
+    applyCamera: Mock;
+    fitCamera: Mock;
+    resetVisualActivity: Mock;
+    setPreview: Mock;
+    toLocal: Mock;
+    updateVisualActivity: Mock;
   }>,
   buildPanelInstances: [] as Array<{
     update: ReturnType<typeof vi.fn>;
@@ -89,6 +93,7 @@ vi.mock('pixi.js', () => ({
 
 vi.mock('../assets/AssetManifest', () => ({
   loadMapTextures: vi.fn(async () => ({})),
+  loadVisualActivityTextures: vi.fn(async () => ({})),
 }));
 
 vi.mock('../rendering/PixiApp', () => ({
@@ -111,6 +116,13 @@ vi.mock('../rendering/PixiApp', () => ({
       hitArea: undefined,
       cursor: undefined,
     },
+    ticker: {
+      add: vi.fn((callback: (ticker: { readonly deltaMS: number }) => void) => {
+        doubles.visualActivityTicker = callback;
+      }),
+      remove: vi.fn(),
+      start: vi.fn(),
+    },
     screen: { width: 800, height: 600 },
     renderer: { resize: doubles.rendererResize },
     render: doubles.appRender,
@@ -123,7 +135,9 @@ vi.mock('../rendering/MapRenderer', () => ({
     refresh = vi.fn();
     applyCamera = vi.fn();
     fitCamera = vi.fn(() => ({ x: 100, y: 50, zoom: 0.5 }));
+    resetVisualActivity = vi.fn();
     setPreview = vi.fn();
+    updateVisualActivity = vi.fn();
 
     toLocal = vi.fn((_global, _container, out) => {
       out.x = 15;
@@ -253,6 +267,10 @@ vi.mock('../ui/SimulationControls', () => ({
   SimulationControls: class SimulationControls {
     update = vi.fn();
     destroy = doubles.simulationControlsDestroy;
+
+    constructor(_host: HTMLElement, onTogglePause: () => boolean) {
+      doubles.simulationControlInstances.push({ onTogglePause });
+    }
   },
 }));
 
@@ -322,6 +340,8 @@ describe('startGame camera and cleanup', () => {
     doubles.agoraPanelInstances.length = 0;
     doubles.advisorInstances.length = 0;
     doubles.saveLoadControlInstances.length = 0;
+    doubles.simulationControlInstances.length = 0;
+    doubles.visualActivityTicker = undefined;
     doubles.persistenceSave.mockReturnValue({ ok: true, message: 'City saved locally.' });
     doubles.persistenceLoad.mockReturnValue({ ok: false, code: 'not_found', message: 'No local save was found.' });
     doubles.selectedTool = 'road';
@@ -370,6 +390,25 @@ describe('startGame camera and cleanup', () => {
     expect(doubles.appDestroy).toHaveBeenCalledWith(true, { children: true });
   });
 
+  it('advances visual activity from Pixi delta and freezes it while paused', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const map = getMapRendererDouble();
+    const controls = doubles.simulationControlInstances[0];
+    if (controls === undefined || doubles.visualActivityTicker === undefined) {
+      throw new Error('Expected visual activity ticker and simulation controls.');
+    }
+
+    doubles.visualActivityTicker({ deltaMS: 120 });
+    expect(map.updateVisualActivity).toHaveBeenLastCalledWith(0.12);
+    expect(controls.onTogglePause()).toBe(true);
+    doubles.visualActivityTicker({ deltaMS: 120 });
+    expect(map.updateVisualActivity).toHaveBeenCalledOnce();
+    cleanup();
+  });
+
   it('refreshes the Agora summary through the central city refresh flow', async () => {
     const cleanup = await startGame(
       { clientWidth: 800, clientHeight: 600 } as HTMLElement,
@@ -405,6 +444,7 @@ describe('startGame camera and cleanup', () => {
     expect(doubles.advisorInstances[0]?.invalidateForCityChange).toHaveBeenCalledWith(
       'Advisor plan cleared after loading a different city.',
     );
+    expect(map.resetVisualActivity).toHaveBeenCalledWith(loadedCity);
     expect(panel.update).toHaveBeenLastCalledWith(
       loadedCity,
       'City loaded locally.',

@@ -21,7 +21,9 @@ Caminhos de origem relativos a `/root/caesaria-game-inspect/resources`:
 | `farm/vegfarm_00001.png` | `farm/vegfarm_00001.png` | Farm de vegetais, protótipo de produção de comida |
 | `granary/warehouse_00001.png` | `warehouse/warehouse_00001.png` | Warehouse temporário para representar granary |
 | `market/commerce_00001.png` | `commerce/commerce_00001.png` | Edifício de comércio usado temporariamente como market, 240×130 |
+| `visual-activity/citizen1.png` | `public/assets/caesaria/gfx/pics.zip:citizen1.png` | Atlas local; runtime usa apenas os frames `citizen01_00001` e `citizen01_00002` (39×39) |
+| `visual-activity/carts.png` | `public/assets/caesaria/gfx/pics_carts.zip:carts.png` | Atlas local; runtime usa apenas os frames `carts_00001` e `carts_00002` (39×39) |
 
-O diretório original `way/` contém indicadores de percurso, não pavimento de estrada. Por isso, a estrada de demonstração usa o pavimento de `ground/`, guardado localmente em `way/`. A relva está originalmente em `land1a/`, não em `ground/`. Não foram copiados atlas nem pastas completas.
+O diretório original `way/` contém indicadores de percurso, não pavimento de estrada. Por isso, a estrada de demonstração usa o pavimento de `ground/`, guardado localmente em `way/`. A relva está originalmente em `land1a/`, não em `ground/`. Não foram copiados atlas nem pastas completas, exceto os dois spritesheets mínimos para os frames de actividade.
 
-Total: 7 PNGs. Todos são carregados e renderizados. Os ficheiros permanecem inalterados; a escala é aplicada no renderer.
+Total: 9 PNGs. Todos são carregados e renderizados. Os ficheiros permanecem inalterados; a escala é aplicada no renderer. Os dois atlases de actividade são a fonte mínima dos frames usados e foram extraídos sem alteração dos arquivos locais Caesaria.

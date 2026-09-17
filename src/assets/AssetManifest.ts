@@ -1,4 +1,4 @@
-import { Assets, type SCALE_MODE, type Texture } from 'pixi.js';
+import { Assets, Rectangle, Texture, type SCALE_MODE } from 'pixi.js';
 
 const base = `${import.meta.env.BASE_URL}assets/prototype/`;
 
@@ -55,4 +55,84 @@ export async function loadMapTextures(): Promise<MapTextures> {
     plaza: market,
     fountain: well,
   });
+}
+
+export interface VisualActivityFrame {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface VisualActivityAsset {
+  readonly source: string;
+  readonly frames: readonly VisualActivityFrame[];
+}
+
+export interface VisualActivityAssetManifest {
+  readonly citizen: VisualActivityAsset;
+  readonly cart: VisualActivityAsset;
+}
+
+export type VisualActivityTextures = Record<keyof VisualActivityAssetManifest, readonly Texture[]>;
+
+export const visualActivityManifest: VisualActivityAssetManifest = {
+  citizen: {
+    source: `${base}visual-activity/citizen1.png`,
+    frames: [
+      { x: 405, y: 771, width: 39, height: 39 },
+      { x: 445, y: 771, width: 39, height: 39 },
+    ],
+  },
+  cart: {
+    source: `${base}visual-activity/carts.png`,
+    frames: [
+      { x: 780, y: 877, width: 39, height: 39 },
+      { x: 780, y: 916, width: 39, height: 39 },
+    ],
+  },
+};
+
+export function parseVisualActivityManifest(value: unknown): VisualActivityAssetManifest {
+  if (typeof value !== 'object' || value === null) throw new Error('Visual activity manifest must be an object.');
+  const manifest = value as Partial<Record<keyof VisualActivityAssetManifest, unknown>>;
+  return {
+    citizen: parseVisualActivityAsset(manifest.citizen, 'citizen'),
+    cart: parseVisualActivityAsset(manifest.cart, 'cart'),
+  };
+}
+
+export async function loadVisualActivityTextures(): Promise<VisualActivityTextures> {
+  const manifest = parseVisualActivityManifest(visualActivityManifest);
+  const [citizen, cart] = await Promise.all([
+    loadVisualActivityTexture(manifest.citizen),
+    loadVisualActivityTexture(manifest.cart),
+  ]);
+  return { citizen, cart };
+}
+
+function parseVisualActivityAsset(value: unknown, kind: string): VisualActivityAsset {
+  if (typeof value !== 'object' || value === null) throw new Error(`Visual activity ${kind} asset must be an object.`);
+  const asset = value as Partial<VisualActivityAsset>;
+  if (typeof asset.source !== 'string' || asset.source.length === 0 || !Array.isArray(asset.frames) || asset.frames.length === 0) {
+    throw new Error(`Visual activity ${kind} asset must have a source and frames.`);
+  }
+  const frames = asset.frames.map((frame) => {
+    if (typeof frame !== 'object' || frame === null) throw new Error(`Visual activity ${kind} frame must be an object.`);
+    const candidate = frame as Partial<VisualActivityFrame>;
+    const { x, y, width, height } = candidate;
+    if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number' || !Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+      throw new Error(`Visual activity ${kind} frame must have positive integer bounds.`);
+    }
+    return { x, y, width, height };
+  });
+  return { source: asset.source, frames };
+}
+
+async function loadVisualActivityTexture(asset: VisualActivityAsset): Promise<readonly Texture[]> {
+  const sourceTexture = configureNearestSampling(await Assets.load<Texture>(asset.source));
+  return asset.frames.map((frame) => new Texture({
+    source: sourceTexture.source,
+    frame: new Rectangle(frame.x, frame.y, frame.width, frame.height),
+  }));
 }

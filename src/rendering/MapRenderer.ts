@@ -1,5 +1,5 @@
-import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
-import type { MapTextures } from '../assets/AssetManifest';
+import { AnimatedSprite, Container, Graphics, Sprite, type Texture } from 'pixi.js';
+import type { MapTextures, VisualActivityTextures } from '../assets/AssetManifest';
 import type { TilePreview } from '../game/TilePreview';
 import type { Building, CityState } from '../simulation/CityState';
 import { getDesirabilityOverlayTiles } from '../simulation/Desirability';
@@ -7,13 +7,28 @@ import { getRoadNetwork } from '../simulation/RoadNetwork';
 import { getFoodCoveredTiles, getTileKey, getWaterCoveredTiles, isWorkplace } from '../simulation/Simulation';
 import { createFittedCamera, type CameraState } from './Camera';
 import { gridToScreen, TILE_HEIGHT, TILE_WIDTH } from './GridMath';
+import {
+  advanceVisualActivity,
+  createVisualActivity,
+  getVisualActivityFrame,
+  getVisualActivityPosition,
+  reconcileVisualActivity,
+  type VisualActivity,
+} from './VisualActivity';
 
 export class MapRenderer extends Container {
   private preview: TilePreview | null = null;
   private previewLayer: Graphics | undefined;
+  private activity: VisualActivity;
+  private activitySprites = new Map<string, AnimatedSprite>();
 
-  constructor(city: CityState, private readonly textures: MapTextures) {
+  constructor(
+    city: CityState,
+    private readonly textures: MapTextures,
+    private readonly activityTextures?: VisualActivityTextures,
+  ) {
     super();
+    this.activity = createVisualActivity(city);
     this.eventMode = 'none';
     this.refresh(city);
   }
@@ -24,12 +39,16 @@ export class MapRenderer extends Container {
       child.destroy({ children: true });
     }
 
+    this.activity = reconcileVisualActivity(this.activity, city);
     const terrain = new Container();
     const overlays = new Container();
+    const roads = new Container();
+    const activity = new Container();
     const buildings = new Container();
     const preview = new Graphics();
     this.previewLayer = preview;
-    this.addChild(terrain, overlays, buildings, preview);
+    this.activitySprites.clear();
+    this.addChild(terrain, overlays, roads, activity, buildings, preview);
 
     for (const tile of city.tiles) {
       terrain.addChild(this.createTileSprite(tile, this.textures[tile.terrain]));
@@ -73,13 +92,18 @@ export class MapRenderer extends Container {
     const roadNetwork = options.roadNetworkOverlay === true ? getRoadNetwork(city) : undefined;
     for (const building of renderedBuildings) {
       const sprite = this.createBuildingSprite(building, options);
-      if (building.type === 'road' && roadNetwork !== undefined) {
-        sprite.tint = roadNetwork.mainRoadTiles.has(getTileKey(building.x, building.y))
-          ? 0x65b84a
-          : 0xe87542;
+      if (building.type === 'road') {
+        if (roadNetwork !== undefined) {
+          sprite.tint = roadNetwork.mainRoadTiles.has(getTileKey(building.x, building.y))
+            ? 0x65b84a
+            : 0xe87542;
+        }
+        roads.addChild(sprite);
+      } else {
+        buildings.addChild(sprite);
       }
-      buildings.addChild(sprite);
     }
+    this.createActivitySprites(activity);
     this.drawPreview();
 
   }
@@ -107,6 +131,23 @@ export class MapRenderer extends Container {
     this.fitCamera(width, height);
   }
 
+  /** Clears and deterministically regenerates only presentation entities on the next refresh. */
+  resetVisualActivity(city: CityState): void {
+    this.activity = createVisualActivity(city);
+  }
+
+  updateVisualActivity(deltaSeconds: number): void {
+    advanceVisualActivity(this.activity, deltaSeconds);
+    for (const entity of this.activity.entities) {
+      const sprite = this.activitySprites.get(entity.id);
+      if (sprite === undefined) continue;
+      const position = getVisualActivityPosition(entity);
+      const screen = gridToScreen(position.x, position.y);
+      sprite.position.set(screen.x, screen.y + TILE_HEIGHT / 2 - 6);
+      sprite.gotoAndStop(getVisualActivityFrame(entity, sprite.totalFrames));
+    }
+  }
+
   setPreview(preview: TilePreview | null): void {
     this.preview = preview;
     this.drawPreview();
@@ -123,6 +164,21 @@ export class MapRenderer extends Container {
       this.preview.state === 'free' ? 0x65b84a : 0xe87542,
       0.42,
     );
+  }
+
+  private createActivitySprites(layer: Container): void {
+    if (this.activityTextures === undefined) return;
+    for (const entity of this.activity.entities) {
+      const textures = this.activityTextures[entity.kind];
+      if (textures.length === 0) continue;
+      const sprite = new AnimatedSprite(textures as Texture[]);
+      sprite.autoUpdate = false;
+      sprite.anchor.set(0.5, 1);
+      sprite.scale.set(entity.kind === 'cart' ? 1.15 : 1);
+      this.activitySprites.set(entity.id, sprite);
+      layer.addChild(sprite);
+    }
+    this.updateVisualActivity(0);
   }
 
   private drawCoverageTile(graphics: Graphics, x: number, y: number, color: number, alpha: number): void {

@@ -64,6 +64,25 @@ describe('road network rendering', () => {
     map.destroy({ children: true });
   });
 
+  it('creates one visual activity sprite per deterministic entity without accumulation', () => {
+    const city = createRoadCity();
+    const activityTextures = { citizen: [Texture.EMPTY, Texture.EMPTY], cart: [Texture.EMPTY, Texture.EMPTY] } as const;
+    const map = new MapRenderer(city, textures, activityTextures);
+
+    expect((map.children[3] as Container).children).toHaveLength(5);
+    map.updateVisualActivity(0.25);
+    map.refresh(city);
+    expect((map.children[3] as Container).children).toHaveLength(5);
+
+    placeBuilding(city, 3, 1, 'road');
+    map.refresh(city);
+    expect((map.children[3] as Container).children).toHaveLength(5);
+    map.resetVisualActivity(city);
+    map.refresh(city);
+    expect((map.children[3] as Container).children).toHaveLength(5);
+    map.destroy({ children: true });
+  });
+
   it('preserves actual camera pan and zoom across overlay toggles and city refreshes', () => {
     const city = createRoadCity();
     const map = new MapRenderer(city, textures);
@@ -90,14 +109,14 @@ describe('tile preview rendering', () => {
     map.applyCamera(camera);
 
     map.setPreview({ x: 3, y: 3, state: 'free' });
-    const preview = map.children[3];
+    const preview = map.children[5];
     expect(preview).toBeInstanceOf(Graphics);
     if (!(preview instanceof Graphics)) throw new Error('Expected preview graphics layer.');
     expect(preview.getLocalBounds().width).toBeGreaterThan(0);
 
     map.setPreview({ x: 1, y: 1, state: 'occupied', buildingType: 'road' });
     map.refresh(city);
-    const refreshedPreview = map.children[3];
+    const refreshedPreview = map.children[5];
     expect(refreshedPreview).toBeInstanceOf(Graphics);
     if (!(refreshedPreview instanceof Graphics)) throw new Error('Expected refreshed preview graphics layer.');
     expect(refreshedPreview.getLocalBounds().width).toBeGreaterThan(0);
