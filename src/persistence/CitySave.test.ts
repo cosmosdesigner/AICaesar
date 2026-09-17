@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { fulfillImperialRequest } from '../events/Events';
 import { createCityState, demolishBuilding } from '../simulation/CityState';
+import { evaluateScenario } from '../scenario/Scenario';
+import { createSessionMetrics } from '../game/SessionMetrics';
 import { simulateTick } from '../simulation/Simulation';
 import {
   deserializeCityState,
@@ -94,6 +96,21 @@ describe('CitySave', () => {
 
     expect(JSON.parse(serialized)).toMatchObject({ schemaVersion: SAVE_SCHEMA_VERSION });
     expect(city).toEqual(before);
+  });
+
+  it('keeps scenario selection and session metrics out of the v1 save payload', () => {
+    const city = createCityState();
+    const metrics = createSessionMetrics(city, 'merchant-quarter', 'easy', evaluateScenario(city));
+
+    const saved = JSON.parse(serializeCityState(city)) as { readonly city: Record<string, unknown> };
+
+    expect(metrics).toMatchObject({ scenarioId: 'merchant-quarter', difficulty: 'easy' });
+    expect(saved).not.toHaveProperty('scenarioId');
+    expect(saved).not.toHaveProperty('difficulty');
+    expect(saved).not.toHaveProperty('metrics');
+    expect(saved.city).not.toHaveProperty('scenarioId');
+    expect(saved.city).not.toHaveProperty('difficulty');
+    expect(saved.city).not.toHaveProperty('metrics');
   });
 
   it.each([

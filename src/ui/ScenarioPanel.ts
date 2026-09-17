@@ -14,6 +14,8 @@ const STATUS_LABELS: Readonly<Record<ScenarioStatus, string>> = {
 
 export class ScenarioPanel {
   private readonly element = document.createElement('section');
+  private readonly title = document.createElement('h2');
+  private readonly briefing = document.createElement('p');
   private readonly status = document.createElement('strong');
   private readonly tick = document.createElement('strong');
   private readonly objectives = document.createElement('ol');
@@ -23,11 +25,8 @@ export class ScenarioPanel {
     this.element.className = 'scenario-panel';
     this.element.setAttribute('aria-label', 'Scenario');
 
-    const title = document.createElement('h2');
-    title.textContent = definition.title;
-
-    const briefing = document.createElement('p');
-    briefing.textContent = definition.briefing;
+    this.title.textContent = definition.title;
+    this.briefing.textContent = definition.briefing;
 
     const state = document.createElement('p');
     state.append('Status: ', this.status);
@@ -38,8 +37,13 @@ export class ScenarioPanel {
     this.result.className = 'scenario-result';
     this.result.setAttribute('role', 'status');
 
-    this.element.append(title, briefing, state, ticks, this.objectives, this.result);
+    this.element.append(this.title, this.briefing, state, ticks, this.objectives, this.result);
     host.append(this.element);
+  }
+
+  setDefinition(definition: ScenarioDefinition): void {
+    this.title.textContent = definition.title;
+    this.briefing.textContent = definition.briefing;
   }
 
   update(progress: ScenarioProgress): void {

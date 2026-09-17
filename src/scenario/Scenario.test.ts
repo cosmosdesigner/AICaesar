@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createCityState, type Building, type CityState } from '../simulation/CityState';
+import { createCityState, createCityStateForScenario, type Building, type CityState } from '../simulation/CityState';
 import { assignWorkers, getPopulationStats, simulateTick } from '../simulation/Simulation';
 import type { BuildingType, Tile } from '../simulation/Tile';
 import {
+  DIFFICULTY_PROFILES,
   FOUNDING_SETTLEMENT_SCENARIO,
+  SCENARIO_CATALOG,
   evaluateScenario,
+  resolveScenario,
   type ScenarioObjective,
   type ScenarioProgress,
 } from './Scenario';
@@ -178,5 +181,87 @@ describe('Founding Settlement scenario evaluation', () => {
     const resetCity = createCityState();
 
     expect(evaluateScenario(resetCity, FOUNDING_SETTLEMENT_SCENARIO).status).toBe('active');
+  });
+});
+
+describe('Phase 25 scenario catalog and difficulty profiles', () => {
+  it('exports exactly three immutable scenarios with distinct ids and briefings', () => {
+    expect(SCENARIO_CATALOG.map((definition) => definition.id)).toEqual([
+      'founding-settlement',
+      'merchant-quarter',
+      'resilient-province',
+    ]);
+    expect(new Set(SCENARIO_CATALOG.map((definition) => definition.briefing)).size).toBe(3);
+    expect(Object.isFrozen(SCENARIO_CATALOG)).toBe(true);
+
+    for (const definition of SCENARIO_CATALOG) {
+      expect(Object.isFrozen(definition)).toBe(true);
+      expect(Object.isFrozen(definition.objectives)).toBe(true);
+      expect(Object.isFrozen(definition.seed)).toBe(true);
+      expect(Object.isFrozen(definition.seed.buildings)).toBe(true);
+    }
+  });
+
+  it('creates an evaluable Normal city for every scenario from supported deterministic seeds', () => {
+    for (const definition of SCENARIO_CATALOG) {
+      const normal = resolveScenario(definition, 'normal');
+      const city = createCityStateForScenario(normal);
+      assignWorkers(city);
+
+      expect(city.resources.money).toBe(definition.initialMoney);
+      expect(city.buildings.map(({ type, x, y, population }) => ({ type, x, y, population })))
+        .toEqual(createCityStateForScenario(normal).buildings.map(({ type, x, y, population }) => ({ type, x, y, population })));
+      expect(evaluateScenario(city, normal)).toMatchObject({
+        status: 'active',
+        totalObjectives: definition.objectives.length,
+        maxTicks: definition.maxTicks,
+      });
+
+      city.resources.money = normal.loseBelowMoney - 1;
+      expect(evaluateScenario(city, normal).status).toBe('lost');
+    }
+  });
+
+  it('makes Easy no stricter than Normal while preserving bounded percentage targets', () => {
+    expect(DIFFICULTY_PROFILES.map((profile) => profile.id)).toEqual(['easy', 'normal']);
+    for (const definition of SCENARIO_CATALOG) {
+      const easy = resolveScenario(definition, 'easy');
+      const normal = resolveScenario(definition, 'normal');
+
+      expect(easy.initialMoney).toBeGreaterThanOrEqual(normal.initialMoney);
+      expect(easy.maxTicks).toBeGreaterThanOrEqual(normal.maxTicks);
+      expect(easy.loseBelowMoney).toBeLessThanOrEqual(normal.loseBelowMoney);
+      for (const normalObjective of normal.objectives) {
+        const easyObjective = easy.objectives.find((objective) => objective.id === normalObjective.id);
+        if (easyObjective === undefined) throw new Error(`Missing Easy objective ${normalObjective.id}`);
+        expect(
+          normalObjective.direction === 'at-most'
+            ? easyObjective.target >= normalObjective.target
+            : easyObjective.target <= normalObjective.target,
+        ).toBe(true);
+        if (easyObjective.unit === 'percent') {
+          expect(easyObjective.target).toBeGreaterThanOrEqual(0);
+          expect(easyObjective.target).toBeLessThanOrEqual(100);
+        }
+      }
+    }
+  });
+
+  it('preserves the Founding Settlement Normal Phase 24 baseline', () => {
+    const normal = resolveScenario(FOUNDING_SETTLEMENT_SCENARIO, 'normal');
+
+    expect(normal).toMatchObject({
+      initialMoney: 500,
+      maxTicks: 900,
+      loseBelowMoney: 50,
+      objectives: [
+        { id: 'population', target: 80 },
+        { id: 'water-coverage', target: 70 },
+        { id: 'food-coverage', target: 50 },
+        { id: 'worker-shortage', target: 20 },
+        { id: 'money', target: 100 },
+      ],
+    });
+    expect(createCityState()).toEqual(createCityStateForScenario(normal));
   });
 });

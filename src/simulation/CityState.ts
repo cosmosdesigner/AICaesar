@@ -1,4 +1,4 @@
-import { getHouseSpecification } from './HouseSpecification';
+import { FOUNDING_SETTLEMENT_SCENARIO, type ScenarioDefinition } from '../scenario/Scenario';
 import type { BuildingType, Tile } from './Tile';
 import { clearBuildingEventTarget, createEventState, type EventState } from '../events/Events';
 
@@ -65,6 +65,10 @@ export interface CityState {
 }
 
 export function createCityState(): CityState {
+  return createCityStateForScenario(FOUNDING_SETTLEMENT_SCENARIO);
+}
+
+export function createCityStateForScenario(definition: ScenarioDefinition): CityState {
   const tiles: Tile[] = [];
 
   for (let y = 0; y < MAP_HEIGHT; y++) {
@@ -78,7 +82,7 @@ export function createCityState(): CityState {
     height: MAP_HEIGHT,
     tiles,
     buildings: [],
-    resources: { money: INITIAL_MONEY },
+    resources: { money: definition.initialMoney },
     simulation: {
       tick: 0,
       finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 },
@@ -87,14 +91,8 @@ export function createCityState(): CityState {
     },
   };
 
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    for (let x = 0; x < MAP_WIDTH; x++) {
-      const buildingType = getSeedBuildingType(x, y);
-      if (buildingType) {
-        const population = buildingType === 'house' ? getHouseSpecification(1).populationCapacity : undefined;
-        addBuilding(city, x, y, buildingType, population);
-      }
-    }
+  for (const seedBuilding of definition.seed.buildings) {
+    addBuilding(city, seedBuilding.x, seedBuilding.y, seedBuilding.type, seedBuilding.initialPopulation);
   }
 
   return city;
@@ -158,15 +156,6 @@ export function demolishBuilding(city: CityState, x: number, y: number): Demolis
   return 'demolished';
 }
 
-function getSeedBuildingType(x: number, y: number): BuildingType | undefined {
-  if (y === 15 && x >= 5 && x <= 24) return 'road';
-  if ((y === 14 || y === 16) && (x === 8 || x === 10 || x === 12 || x === 14)) return 'house';
-  if (x === 16 && y === 14) return 'well';
-  if (x === 18 && y === 16) return 'farm';
-  if (x === 20 && y === 14) return 'granary';
-  if (x === 22 && y === 16) return 'market';
-  return undefined;
-}
 
 function addBuilding(city: CityState, x: number, y: number, type: BuildingType, initialPopulation?: number): void {
   const tile = getTile(city, x, y);

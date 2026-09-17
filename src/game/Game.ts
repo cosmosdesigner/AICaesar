@@ -8,10 +8,14 @@ import { createPixiApp } from '../rendering/PixiApp';
 import {
   FOUNDING_SETTLEMENT_SCENARIO,
   evaluateScenario,
+  getScenario,
   getScenarioContext,
+  resolveScenario,
+  type DifficultyId,
+  type ScenarioId,
 } from '../scenario/Scenario';
 import {
-  createCityState,
+  createCityStateForScenario,
   demolishBuilding,
   placeBuilding,
   type BuildResult,
@@ -24,15 +28,23 @@ import { BuildPanel, BUILD_LABELS } from '../ui/BuildPanel';
 import { EventPanel } from '../ui/EventPanel';
 import { AdvisorPanel } from '../ui/AdvisorPanel';
 import { ScenarioPanel } from '../ui/ScenarioPanel';
+import { ScenarioSelector } from '../ui/ScenarioSelector';
+import { MetricsPanel } from '../ui/MetricsPanel';
 import { SimulationControls } from '../ui/SimulationControls';
 import { CameraControls } from '../ui/CameraControls';
 import { SaveLoadControls } from '../ui/SaveLoadControls';
 import { getSimulationIntervalMs, type SimulationSpeed } from './SimulationSpeed';
+import { createSessionMetrics, recordSessionMetric, refreshSessionMetrics } from './SessionMetrics';
 
 export async function startGame(host: HTMLElement, panelHost: HTMLElement): Promise<() => void> {
   const ZOOM_STEP = 1.1;
-  let city = createCityState();
+  let selectedScenarioId: ScenarioId = FOUNDING_SETTLEMENT_SCENARIO.id;
+  let selectedDifficulty: DifficultyId = 'normal';
+  let activeScenario = resolveScenario(FOUNDING_SETTLEMENT_SCENARIO, selectedDifficulty);
+  let city = createCityStateForScenario(activeScenario);
   assignWorkers(city);
+  let metrics = createSessionMetrics(city, selectedScenarioId, selectedDifficulty, evaluateScenario(city, activeScenario));
+  const failedRequestIds = new Set<string>();
   let waterOverlay = false;
   let foodOverlay = false;
   let desirabilityOverlay = false;
@@ -43,6 +55,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   let spacePanActive = false;
   let isPanning = false;
   let lastPanPoint: { x: number; y: number } | undefined;
+  let advisor: AdvisorPanel | undefined;
   const textures = await loadMapTextures();
   const app = await createPixiApp(host);
   const map = new MapRenderer(city, textures);
@@ -50,37 +63,11 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   let camera: CameraState = map.fitCamera(app.screen.width, app.screen.height);
   const panel = new BuildPanel(
     panelHost,
-    () => {
-      city = createCityState();
-      assignWorkers(city);
-      refreshCity('Cidade, dinheiro e simulação inicial restaurados.');
-      centerCamera();
-    },
-    () => {
-      waterOverlay = !waterOverlay;
-      map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
-      app.render();
-      return waterOverlay;
-    },
-    () => {
-      foodOverlay = !foodOverlay;
-      map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
-      app.render();
-      return foodOverlay;
-    },
-    () => {
-      desirabilityOverlay = !desirabilityOverlay;
-      map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
-      app.render();
-      return desirabilityOverlay;
-    },
-
-    () => {
-      roadNetworkOverlay = !roadNetworkOverlay;
-      map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
-      app.render();
-      return roadNetworkOverlay;
-    },
+    () => resetActiveScenario('Scenario reset with the selected deterministic profile.'),
+    () => toggleOverlay('water'),
+    () => toggleOverlay('food'),
+    () => toggleOverlay('desirability'),
+    () => toggleOverlay('road-network'),
   );
   const cameraControls = new CameraControls(
     panelHost,
@@ -105,24 +92,38 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     },
   );
   simulationControls.update(paused, speed);
-  const scenarioPanel = new ScenarioPanel(panelHost, FOUNDING_SETTLEMENT_SCENARIO);
+  const scenarioPanel = new ScenarioPanel(panelHost, activeScenario);
+  const metricsPanel = new MetricsPanel(panelHost);
   const eventPanel = new EventPanel(panelHost, () => city, () => {
     const fulfilled = fulfillImperialRequest(city);
-    if (fulfilled) refreshCity('Imperial request fulfilled.');
+    if (fulfilled) {
+      metrics = recordSessionMetric(metrics, 'imperialRequestsFulfilled');
+      refreshCity('Imperial request fulfilled.');
+    }
     return fulfilled;
   });
-  const advisor = new AdvisorPanel(panelHost, () => city, {
-    getScenarioContext: () => getScenarioContext(evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO)),
-    getScenarioProgress: () => evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO),
+  advisor = new AdvisorPanel(panelHost, () => city, {
+    getScenarioContext: () => getScenarioContext(evaluateScenario(city, activeScenario)),
+    getScenarioProgress: () => evaluateScenario(city, activeScenario),
     isApprovalBlocked: isScenarioTerminal,
     onApprovePlan: (plan) => {
-      if (isScenarioTerminal()) {
-        return { ok: false, message: 'Advisor plan approval is blocked because the scenario has ended.' };
-      }
+      if (isScenarioTerminal()) return { ok: false, message: 'Advisor plan approval is blocked because the scenario has ended.' };
+      const buildingCount = city.buildings.length;
       const result = approveAdvisorPlan(city, plan);
-      if (result.ok) refreshCity(result.message);
+      if (result.ok) {
+        metrics = recordSessionMetric(metrics, 'advisorPlansApproved');
+        for (let index = buildingCount; index < city.buildings.length; index += 1) metrics = recordSessionMetric(metrics, 'buildingsConstructed');
+        refreshCity(result.message);
+      }
       return result;
     },
+    onRejectPlan: () => { metrics = recordSessionMetric(metrics, 'advisorPlansRejected'); },
+  });
+  const selector = new ScenarioSelector(panelHost, { scenarioId: selectedScenarioId, difficulty: selectedDifficulty }, ({ scenarioId, difficulty }) => {
+    selectedScenarioId = scenarioId;
+    selectedDifficulty = difficulty;
+    activeScenario = resolveScenario(getScenario(selectedScenarioId), selectedDifficulty);
+    resetActiveScenario('Started a fresh city for the selected scenario and difficulty.');
   });
 
   const saveLoadControls = new SaveLoadControls(
@@ -132,7 +133,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       const result = loadCityState();
       if (result.ok) {
         city = result.city;
-        advisor.invalidateForCityChange('Advisor plan cleared after loading a different city.');
+        advisor?.invalidateForCityChange('Advisor plan cleared after loading a different city.');
         refreshCity(result.message);
       }
       return result;
@@ -140,14 +141,10 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   );
 
   const buildMessages: Record<Exclude<BuildResult, 'built'>, string> = {
-    'outside-map': 'Construa dentro do mapa.',
-    occupied: 'Tile ocupado. Escolha um tile vazio.',
-    'insufficient-funds': 'Dinheiro insuficiente.',
+    'outside-map': 'Construa dentro do mapa.', occupied: 'Tile ocupado. Escolha um tile vazio.', 'insufficient-funds': 'Dinheiro insuficiente.',
   };
   const demolishMessages: Record<Exclude<DemolishResult, 'demolished'>, string> = {
-    'outside-map': 'Demola dentro do mapa.',
-    empty: 'Não há edifício ou estrada neste tile.',
-    'inconsistent-state': 'Demolição bloqueada: os dados do edifício são inconsistentes.',
+    'outside-map': 'Demola dentro do mapa.', empty: 'Não há edifício ou estrada neste tile.', 'inconsistent-state': 'Demolição bloqueada: os dados do edifício são inconsistentes.',
   };
   const local = new Point();
   app.stage.eventMode = 'static';
@@ -166,46 +163,28 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       refreshCity('Construção e demolição bloqueadas: o cenário terminou. Use Reset para recomeçar.');
       return;
     }
-
     map.toLocal(event.global, undefined, local);
     const tile = screenToGrid(local.x, local.y);
     if (panel.selectedTool === 'bulldoze') {
       const result = tile ? demolishBuilding(city, tile.x, tile.y) : 'outside-map';
       if (result === 'demolished') {
         assignWorkers(city);
-        advisor.invalidateForCityChange('Advisor plan cleared after demolition.');
+        metrics = recordSessionMetric(metrics, 'buildingsDemolished');
+        advisor?.invalidateForCityChange('Advisor plan cleared after demolition.');
         refreshCity('Edifício demolido.');
         return;
       }
-
-      panel.update(
-        city,
-        demolishMessages[result],
-        waterOverlay,
-        foodOverlay,
-        desirabilityOverlay,
-        roadNetworkOverlay,
-        { buildBlocked: isScenarioTerminal() },
-      );
+      panel.update(city, demolishMessages[result], waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay, { buildBlocked: isScenarioTerminal() });
       return;
     }
-
     const result = tile ? placeBuilding(city, tile.x, tile.y, panel.selectedTool) : 'outside-map';
     if (result === 'built') {
       assignWorkers(city);
+      metrics = recordSessionMetric(metrics, 'buildingsConstructed');
       refreshCity(`${BUILD_LABELS[panel.selectedTool]} construído.`);
       return;
     }
-
-    panel.update(
-      city,
-      buildMessages[result],
-      waterOverlay,
-      foodOverlay,
-      desirabilityOverlay,
-      roadNetworkOverlay,
-      { buildBlocked: isScenarioTerminal() },
-    );
+    panel.update(city, buildMessages[result], waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay, { buildBlocked: isScenarioTerminal() });
   });
   app.stage.on('pointermove', (event: FederatedPointerEvent) => {
     if (!isPanning || lastPanPoint === undefined) return;
@@ -215,7 +194,6 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   });
   app.stage.on('pointerup', stopPan);
   app.stage.on('pointerupoutside', stopPan);
-
   app.canvas.addEventListener('wheel', handleWheel, { passive: false });
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('keyup', handleKeyUp);
@@ -227,26 +205,46 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     app.render();
   };
 
+  function resetActiveScenario(message: string): void {
+    city = createCityStateForScenario(activeScenario);
+    assignWorkers(city);
+    failedRequestIds.clear();
+    metrics = createSessionMetrics(city, selectedScenarioId, selectedDifficulty, evaluateScenario(city, activeScenario));
+    advisor?.invalidateForCityChange('Advisor plan and report cleared for a fresh city.');
+    scenarioPanel.setDefinition(activeScenario);
+    refreshCity(message);
+    centerCamera();
+  }
+
+  function toggleOverlay(kind: 'water' | 'food' | 'desirability' | 'road-network'): boolean {
+    if (kind === 'water') waterOverlay = !waterOverlay;
+    if (kind === 'food') foodOverlay = !foodOverlay;
+    if (kind === 'desirability') desirabilityOverlay = !desirabilityOverlay;
+    if (kind === 'road-network') roadNetworkOverlay = !roadNetworkOverlay;
+    map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
+    app.render();
+    return kind === 'water' ? waterOverlay : kind === 'food' ? foodOverlay : kind === 'desirability' ? desirabilityOverlay : roadNetworkOverlay;
+  }
+
   function refreshCity(message: string): void {
     map.refresh(city, { waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay });
-    const scenarioProgress = evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO);
+    const scenarioProgress = evaluateScenario(city, activeScenario);
+    const request = city.simulation.events?.pendingRequest;
+    if (request?.status === 'failed' && !failedRequestIds.has(request.id)) {
+      failedRequestIds.add(request.id);
+      metrics = recordSessionMetric(metrics, 'imperialRequestsFailed');
+    }
+    metrics = refreshSessionMetrics(metrics, city, scenarioProgress);
     if (scenarioProgress.status !== 'active') {
       paused = true;
       scheduleTick();
       simulationControls.update(paused, speed);
     }
     scenarioPanel.update(scenarioProgress);
+    metricsPanel.update(metrics);
     eventPanel.update(city);
-    advisor.updateScenarioContext();
-    panel.update(
-      city,
-      scenarioProgress.resultMessage ?? message,
-      waterOverlay,
-      foodOverlay,
-      desirabilityOverlay,
-      roadNetworkOverlay,
-      { buildBlocked: scenarioProgress.status !== 'active' },
-    );
+    advisor?.updateScenarioContext();
+    panel.update(city, scenarioProgress.resultMessage ?? message, waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay, { buildBlocked: scenarioProgress.status !== 'active' });
     app.render();
   }
 
@@ -256,7 +254,6 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       tickHandle = undefined;
     }
     if (paused) return;
-
     tickHandle = window.setInterval(() => {
       simulateTick(city);
       refreshCity('Simulação atualizada.');
@@ -264,7 +261,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   }
 
   function isScenarioTerminal(): boolean {
-    return evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO).status !== 'active';
+    return evaluateScenario(city, activeScenario).status !== 'active';
   }
 
   function applyCamera(nextCamera: CameraState): void {
@@ -301,10 +298,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     event.preventDefault();
     if (event.deltaY === 0) return;
     const bounds = app.canvas.getBoundingClientRect();
-    zoomAt(
-      { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
-      event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP,
-    );
+    zoomAt({ x: event.clientX - bounds.left, y: event.clientY - bounds.top }, event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP);
   }
 
   function handleKeyDown(event: KeyboardEvent): void {
@@ -322,7 +316,6 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   }
 
   refreshCity('Clique num tile vazio para construir.');
-
   const observer = new ResizeObserver(resize);
   observer.observe(host);
   resize();
@@ -338,8 +331,10 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     cameraControls.destroy();
     simulationControls.destroy();
     scenarioPanel.destroy();
+    metricsPanel.destroy();
     eventPanel.destroy();
-    advisor.destroy();
+    advisor?.destroy();
+    selector.destroy();
     saveLoadControls.destroy();
     app.destroy(true, { children: true });
   };

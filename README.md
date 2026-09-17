@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 24 — advisor estratégico**: mapa isométrico 30×30, construção e demolição manual de roads/houses/wells/farms/granaries/markets e amenities garden/plaza/fountain, rede principal e serviços por distância BFS em estradas, desirability local determinística, população, workers, finanças, eventos temporários determinísticos, pedidos do imperador, cenário, advisor mock local estratégico com planos multi-ação, alternativas/trade-offs, orçamento recomendado, execução transaccional validada de planos aprovados, after-action promise-vs-result, overlays de água/comida/rede viária/desirability e save/load local versionado.
+**Fase 25 — cenários, dificuldade e métricas de sessão**: mapa isométrico 30×30, construção e demolição manual de roads/houses/wells/farms/granaries/markets e amenities garden/plaza/fountain, rede principal e serviços por distância BFS em estradas, desirability local determinística, população, workers, finanças, eventos temporários determinísticos, pedidos do imperador, três cenários determinísticos com perfis Easy/Normal, advisor mock local estratégico com planos multi-ação, after-action promise-vs-result, métricas locais de sessão, overlays de água/comida/rede viária/desirability e save/load local v1.
 
 ## Executar localmente
 
@@ -19,13 +19,13 @@ npm test
 npm run preview
 ```
 
-`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa as regressões Vitest do seed inicial, cenário, câmara, renderer, rede viária/BFS, analyzer, advisor, ações, evolução/degradação de casas, desirability, logística de comida, população, economia financeira e persistência local. `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui assets temporários e não deve ser publicado.** Browser/manual UI testing está fora do escopo da Fase 24; renderer, advisor e integração do jogo usam regressões automatizadas headless.
+`build` verifica TypeScript em modo estrito e gera `dist/`; `test` executa as regressões Vitest do catálogo de cenários, perfis Easy/Normal, seeds, métricas de sessão, câmara, renderer, rede viária/BFS, analyzer, advisor, ações, evolução/degradação de casas, desirability, logística de comida, população, economia financeira e persistência local. `preview` serve esse build localmente. `node_modules/` e `dist/` estão ignorados pelo Git. **O build é apenas para validação local: inclui assets temporários e não deve ser publicado.** Browser/manual UI testing está fora do escopo da Fase 25; renderer, seleção de cenário e integração do jogo usam regressões automatizadas headless.
 
 ## O que aparece
 
 - 900 tiles de relva numa grelha lógica 30×30.
-- Uma estrada central de 20 tiles, oito casas, um poço, uma farm, uma granary e um market, seedados de forma determinística e gratuitos.
-- Casas começam no nível 1; as oito casas seedadas começam cheias, com 4 habitantes cada (32 no total), enquanto casas construídas pelo jogador ou advisor começam vazias. Casas ligadas à rede principal e com cobertura de água evoluem para nível 2 após 3 ticks de serviço.
+- O painel **Scenario setup** permite iniciar **Found a functioning settlement**, **Establish a merchant quarter** ou **Keep a resilient province** em **Easy** ou **Normal**. Cada seleção cria um seed gratuito e determinístico; Founding Settlement / Normal mantém a estrada central de 20 tiles, oito casas, um poço, uma farm, uma granary e um market da baseline anterior.
+- Casas começam no nível 1; o seed de Founding Settlement tem oito casas cheias, com 4 habitantes cada (32 no total), enquanto casas construídas pelo jogador ou advisor começam vazias. Casas ligadas à rede principal e com cobertura de água evoluem para nível 2 após 3 ticks de serviço.
 - População é o número de residentes atuais, não a capacidade: os níveis 1/2/3 permitem **4/8/14** habitantes por casa. Evoluir abre vagas sem criar residentes automaticamente.
 - Em ticks globais múltiplos de **3**, cada casa com estrada + água + comida ganha 1 habitante até à capacidade; em ticks globais múltiplos de **5**, cada casa à qual falte qualquer um desses serviços perde 1 habitante até zero. Não são contadores individuais desde a construção ou desde a chegada dos serviços.
 - A degradação limita imediatamente os residentes à nova capacidade. O saldo populacional do último tick inclui tanto imigração/emigração como perdas por esse limite.
@@ -47,6 +47,7 @@ npm run preview
 - Sprites reais da Caesaria, alinhados pela base do tile e ordenados de trás para a frente; casas nível 2 recebem tint clara e nível 3 tint verde. Garden, plaza e fountain reutilizam temporariamente sprites de farm, market e well, respetivamente, com tint verde/dourado/azul.
 - Câmara centrada/enquadrada no arranque e em **Reset**; redimensionamento, construção, overlays, ticks e advisor preservam pan/zoom atuais.
 - Painel **Map navigation** com **Zoom in**, **Zoom out** e **Center map**, tooltips e ajuda curta: `Pan: middle-drag or Space + left-drag`; `Zoom: mouse wheel or controls`. O zoom da câmara é limitado a **2x** para não ampliar em excesso os sprites temporários de baixa resolução.
+- O painel **Session metrics** mostra cenário/dificuldade, estado, tick, pico de população, menor tesouraria, construções/demolições bem-sucedidas, planos aprovados/rejeitados e pedidos imperiais cumpridos/falhados. É estado local da sessão: reset ou troca de seleção recria e limpa as métricas; edifícios seedados e operações rejeitadas não contam.
 
 
 ## Eventos e pressão de jogo
@@ -63,43 +64,45 @@ Estes eventos são pressão moderada de protótipo; não existem ainda combate, 
 
 ## Save/load local
 
-Os botões **Save** e **Load** guardam ou restauram a cidade atual no mesmo browser, numa única chave `localStorage` namespaced (`aicaesar.save.v1`). O payload JSON inclui `schemaVersion: 1`, mapa, edifícios, recursos, simulação, stocks, população, finanças e estado de eventos; não inclui renderer, câmara, DOM ou configuração da sessão.
+Os botões **Save** e **Load** guardam ou restauram a cidade atual no mesmo browser, numa única chave `localStorage` namespaced (`aicaesar.save.v1`). O payload JSON inclui `schemaVersion: 1`, mapa, edifícios, recursos, simulação, stocks, população, finanças e estado de eventos; não inclui renderer, câmara, DOM, cenário/dificuldade selecionados nem métricas de sessão.
 
 O Load valida o envelope e todos os dados antes de hidratar uma cópia independente, recalcula o estado derivado sem avançar ticks e mantém a cidade ativa se o save estiver ausente, incompatível, corrompido ou se o storage falhar. **Reset** não apaga o save local. Não há backend, cloud saves, slots, autosave nem import/export de ficheiros.
 
 Verificar esta fase sem browser manual:
 
 ```sh
-npm test -- --run
+npm test
 npm run build
 git diff --check
 ```
 
+As seis rotas determinísticas de cenário/dificuldade e os resultados esperados estão no [checklist de playtest da Fase 25](documentation/phase-25-playtest-checklist.md).
+
 ## Demo rápido de 5 minutos
 
-1. Abrir a app e observar o seed: estrada central, casas, poço, farm, granary e market já existem sem custo inicial.
-2. Ler o painel **Found a functioning settlement**: o cenário começa **Active** e mostra quantos objetivos já estão completos.
+1. Abrir a app, escolher cenário e dificuldade em **Scenario setup** e clicar **Start selected scenario**. A seleção inicial é Founding Settlement / Normal; qualquer opção inicia um seed novo determinístico.
+2. Ler o painel do cenário ativo: briefing, metas, progresso, tick limite e resultado. **Easy** dá +200 dinheiro, metas `at-least` a 75%, +20 pontos percentuais à meta `at-most` de workers, 25% mais ticks e derrota abaixo de 0; **Normal** preserva os valores base do cenário.
 3. Usar **Pause** para parar os ticks; **Show road network** distingue a rede principal das roads isoladas, **Show water coverage**/**Show food coverage** mostram o alcance efetivo ao longo dessa rede e **Show desirability** mostra onde amenities ou edifícios económicos alteram qualidade urbana.
-4. Voltar a **Play** em **1x**, depois experimentar **2x** ou **4x** para acelerar produção, consumo, upgrades e avanço do limite de 900 ticks.
-5. Construir casas/serviços em tiles vazios e usar **Analyze city**/**Approve** para executar um plano validado. O advisor mostra a meta restante principal do cenário. Casas novas aumentam vagas, não residentes: observar os serviços e esperar pelos ticks de imigração para ganhar população/workers.
-6. Se todos os objetivos passarem, o estado vira **Victory**; se dinheiro cair abaixo de 50, inclusive por upkeep periódico, ou chegar ao tick 900 sem vitória, vira **Defeat**. Em ambos os casos, ticks, construção e aprovação ficam bloqueados.
-7. Clicar **Reset** para restaurar dinheiro, stocks de granary/market, tick 0, estado financeiro vazio, cidade seedada com 32 residentes e saldo populacional do último tick 0, e cenário **Active**; pausa/velocidade ficam como estão para facilitar nova demonstração.
+4. Voltar a **Play** em **1x**, depois experimentar **2x** ou **4x** para acelerar produção, consumo, upgrades e calendário de eventos.
+5. Construir casas/serviços em tiles vazios e usar **Analyze city**/**Approve** para executar um plano validado. O advisor mostra a meta restante principal do cenário ativo. Casas novas aumentam vagas, não residentes: observar os serviços e esperar pelos ticks de imigração para ganhar população/workers.
+6. O painel **Session metrics** só soma construções/demolições/planos/pedidos bem-sucedidos; acompanha pico de população e menor tesouraria. Se todas as metas passarem, o estado vira **Victory**; se a tesouraria cair abaixo do limiar ativo ou terminar o limite de ticks sem vitória, vira **Defeat**. Em ambos os casos, ticks, construção e aprovação ficam bloqueados.
+7. Clicar **Reset** para recriar o mesmo cenário+dificuldade com o seed, dinheiro, tick 0, estado financeiro, calendário de eventos e métricas iniciais. Mudar a seleção cria outro perfil e também limpa plano/report do advisor.
 
 ## Construção manual
 
-- Dinheiro inicial: **500** em `resources.money`; comida começa **0** em `storedFood` dos granaries e markets, sem stock global em recursos.
+- O dinheiro inicial depende do cenário e dificuldade selecionados; comida começa **0** em `storedFood` dos granaries e markets, sem stock global em recursos. Founding Settlement / Normal começa com **500**.
 - Selecionar **Road (4)**, **House (20)**, **Well (35)**, **Farm (45)**, **Granary (60)**, **Market (50)**, **Garden (12)**, **Plaza (25)**, **Fountain (40)** ou **Bulldoze** no painel; Road começa selecionada. Amenities não exigem workers, comida, storedFood, atividade ou população.
 - Clicar com o botão principal num tile vazio para construir. Com **Bulldoze**, clicar num edifício ou road remove-o sem custo nem refund; workers, serviços, overlays e advisor são atualizados, mas não avança tick nem grava o save local.
 - Cada construção cria um `Building { id, type, x, y }`; só casas guardam `population` (inteiro não negativo), além de `level`, `hasRoadAccess`, `hasWater`, `hasFood`, `upgradeProgress` e `degradeProgress`; workplaces (`farm`, `granary`, `market`) guardam `active`; granaries e markets guardam `storedFood` real. Casas novas têm `population: 0`.
 - Casas usam `src/simulation/HouseSpecification.ts` como única fonte de capacidade, imposto de ocupação completa, requisitos e ticks de evolução dos níveis 1–3: nível 1 tem capacidade 4/imposto máximo 2 sem requisitos de nível, nível 2 capacidade 8/imposto máximo 4 com estrada+água e 3 ticks, nível 3 capacidade 14/imposto máximo 7 com estrada+água+comida+desirability boa e 5 ticks. `src/simulation/Desirability.ts` deriva score 0–100 sem cache persistente: base 50; garden `+8`/raio 2, plaza `+12`/raio 3, fountain `+15`/raio 3, farm `-10`/raio 3, granary `-12`/raio 3 e market `-6`/raio 2, usando distância Manhattan inclusiva e stacking sem falloff. Score `< 40` degrada a casa; apenas `>= 60` permite nível 3. A capacidade e o score não são guardados no `Building`.
 - Farms ativas depositam 2 comida/tick em granaries ativos (capacidade 100). Markets ativos procuram granaries ativos até 8 passos de estrada, reabastecem até 4/tick, têm capacidade 40 e só dão cobertura de comida até 4 passos de estrada quando `storedFood > 0`; casas consomem do market servido a cada 2 ticks. Todos os participantes têm de estar ligados à rede principal.
-- O painel mostra dinheiro, ferramenta selecionada, tick, estatísticas de casas/água/comida, **Avg/Low/Good desirability**, stock de granary, stock/demand de market, markets abastecidos, resumo de requisitos de casas, casas em degradação, população, emprego, finanças, toggles de overlay com labels claros, feedback da última ação e estado do cenário.
-- Tiles ocupados, coordenadas fora do mapa, dinheiro insuficiente, tiles vazios para demolição, referências de edifício inconsistentes e cenário terminado são rejeitados sem alterar cidade, saldo ou comida armazenada. O balanço financeiro pode tornar o saldo negativo; `placeBuilding` continua a validar o saldo disponível antes de construir.
-- **Reset** recria `CityState`, restaurando tiles, `buildings[]`, `resources.money`, `simulation.tick`, `simulation.finance`, edifícios iniciais com `storedFood: 0`, casas seedadas cheias no nível 1, `simulation.population.lastChange: 0`, estado ativo/inativo recalculado e cenário **Active**; scores, stats e overlay de desirability são recalculados, nunca restaurados de estado derivado. Mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
+- O painel mostra dinheiro, ferramenta selecionada, tick, estatísticas de casas/água/comida, **Avg/Low/Good desirability**, stock de granary, stock/demand de market, markets abastecidos, resumo de requisitos de casas, casas em degradação, população, emprego, finanças, toggles de overlay com labels claros, feedback da última ação, estado do cenário e métricas de sessão.
+- Tiles ocupados, coordenadas fora do mapa, dinheiro insuficiente, tiles vazios para demolição, referências de edifício inconsistentes e cenário terminado são rejeitados sem alterar cidade, saldo, comida armazenada ou métricas de interação. O balanço financeiro pode tornar o saldo negativo; `placeBuilding` continua a validar o saldo disponível antes de construir.
+- **Reset** recria `CityState` a partir do seed do cenário+dificuldade atual, restaurando dinheiro, tick 0, finanças, stocks seedados, população seedada, estado ativo/inativo, calendário de eventos e métricas de sessão. Scores, stats e overlay de desirability são recalculados, nunca restaurados de estado derivado. Mantém a ferramenta selecionada, os estados dos overlays e a configuração atual de pausa/velocidade.
 
 O mapa completo é redesenhado após construção válida, execução válida do advisor, save/load, reset, tick de simulação ou toggle de overlay; redimensionamento preserva o mapa e reaplica a câmara. Workplaces inativos aparecem com alpha reduzido e tint vermelho/cinzento. Pan usa botão do meio ou **Space** + drag esquerdo sem construir ao soltar; zoom usa roda do rato ou botões e respeita limites. Continuam fora do escopo rotação, cidadãos individuais, walkers/pathfinding de unidades, commute, salários, tax collectors, nascimento/morte, classes sociais, mini-map, inércia de câmara, múltiplos tipos de comida, backend, contas, sincronização/cloud saves, slots, autosave, import/export, chamada real de LLM por defeito, secrets/API keys, streaming, tool-calling, rollback histórico, execução parcial de plano, combate, crime, multiplayer ou editor de mapas.
 
-Verificação manual: construir Road num tile vazio (saldo 496), selecionar House e clicar no mesmo tile (erro, saldo 496), construir Farm, Granary e Market em tiles vazios. Construir uma House aumenta capacidade/vagas, mas não residentes ou workers imediatamente. Com poucas casas ocupadas e workplaces demais, alguns workplaces ficam inativos; farms inativas não produzem, granaries inativas não recebem/fornecem stock e markets inativos ou vazios não dão cobertura de comida, mas todos continuam a pagar upkeep a cada 10 ticks. Inventários de edifícios inativos são preservados até voltarem a poder ser usados. Reset deve restaurar saldo 500, stocks 0, tick 0, período financeiro 0, 32 residentes em 32 lugares, saldo populacional 0 e a cidade seedada.
+Verificação manual: seguir a rota do perfil escolhido no [checklist da Fase 25](documentation/phase-25-playtest-checklist.md). Construir Road num tile vazio reduz 4 e sobe `Built` uma vez; selecionar House e clicar no mesmo tile é rejeitado sem nova métrica. Com poucas casas ocupadas e workplaces demais, alguns workplaces ficam inativos; farms inativas não produzem, granaries inativas não recebem/fornecem stock e markets inativos ou vazios não dão cobertura de comida, mas todos continuam a pagar upkeep a cada 10 ticks. Inventários de edifícios inativos são preservados até voltarem a poder ser usados.
 
 ## Rede de estradas e alcance de serviços
 
@@ -113,7 +116,7 @@ Verificação manual: construir Road num tile vazio (saldo 496), selecionar Hous
 
 ## Cenário
 
-`FOUNDING_SETTLEMENT_SCENARIO` vive em `src/scenario/Scenario.ts`. A definição é imutável e `evaluateScenario(city, definition)` deriva progresso apenas de `CityState`: residentes atuais por `getWorkforceStats`, água/comida como percentagem de casas, falta de trabalhadores como percentagem de workers required (0% quando `workersRequired === 0`) e dinheiro por `resources.money`. Construir casas vazias não avança o objetivo de população nem resolve worker shortage imediatamente; esses valores mudam à medida que chegam ou saem residentes. Vitória exige todos os objetivos no mesmo tick. Derrota ocorre com `money < 50` ou `simulation.tick >= 900` sem vitória. Ao terminar, `Game.ts` pausa a simulação, bloqueia construção manual e bloqueia aprovação do advisor; **Reset** volta a avaliar uma cidade nova como **Active**.
+`src/scenario/Scenario.ts` exporta um catálogo imutável de três cenários: **Found a functioning settlement** (serviços e crescimento), **Establish a merchant quarter** (layout, cadeia de comida, workers e tesouraria) e **Keep a resilient province** (resiliência no calendário de eventos existente). `resolveScenario` aplica **Easy** ou **Normal** sem mutar a definição base; Normal preserva os valores de cada cenário e Founding Settlement / Normal mantém a baseline de 500 dinheiro, metas 80/70%/50%/≤20%/100, derrota abaixo de 50 e 900 ticks. `createCityStateForScenario` cria o seed deliberado; `evaluateScenario(city, definition)` deriva progresso apenas de `CityState`: residentes atuais, água/comida como percentagem de casas, falta de trabalhadores como percentagem de workers required (0% quando `workersRequired === 0`) e dinheiro. Vitória exige todas as metas na mesma avaliação. Ao terminar, `Game.ts` pausa a simulação, bloqueia construção/demolição e bloqueia aprovação do advisor até **Reset**.
 
 ## Advisor, providers e execução de ações
 
@@ -137,9 +140,9 @@ src/
   actions/ActionValidator.ts Validator puro de AdvisorPlan sem mutar a cidade
   actions/ActionExecutor.ts  Executor transacional simples: valida, constrói e recalcula trabalhadores
   assets/AssetManifest.ts    URLs locais, carregamento das sete texturas de origem e aliases temporários para amenities
-  game/Game.ts              Input PixiJS, construção, save/load local, reset, loop pausável, avaliação de cenário, resize e libertação
-  persistence/CitySave.ts   Serialização, validação fail-closed, hydration e storage local versionado
-  game/SimulationSpeed.ts   Mapeamento 1x/2x/4x para intervalos de tick
+  game/Game.ts              Input PixiJS, seleção/reset de cenário+dificuldade, construção, save/load local, loop pausável, métricas, avaliação de cenário, resize e libertação
+  game/SessionMetrics.ts    Estado derivado da sessão: picos, mínimos e contadores de interações bem-sucedidas, sem persistência
+  persistence/CitySave.ts   Serialização v1 de CityState, validação fail-closed e hydration sem seleção/métricas
   rendering/PixiApp.ts       Canvas PixiJS
   rendering/Camera.ts        Estado e matemática pura da câmara: clamp de zoom, zoom ancorado, pan e fitting
   rendering/MapRenderer.ts   Camadas, profundidade, overlays, refresh sem reset de câmera e aplicação de transform
@@ -148,15 +151,15 @@ src/
   simulation/Simulation.ts   Tick, logística de comida, serviços, evolução com desirability, população, emprego, impostos e estatísticas
   simulation/Desirability.ts Modelo puro de qualidade urbana, scores, tiers, overlay e stats
   simulation/RoadNetwork.ts  Componentes determinísticas, rede principal, conectividade, distâncias BFS e stats
-  scenario/Scenario.ts      Definição imutável Founding Settlement, avaliação pura e contexto curto para advisor
+  scenario/Scenario.ts      Catálogo imutável de três cenários, perfis Easy/Normal, seeds, avaliação pura e contexto curto para advisor
   simulation/Tile.ts         Coordenadas, terreno e referência buildingId opcional
   ui/BuildPanel.ts           Painel HTML: ferramentas, custos, dinheiro, stats, top 3 issues, overlays, feedback, reset e bloqueio terminal
   ui/SimulationControls.ts   Painel HTML de pause/play e velocidade 1x/2x/4x
   ui/CameraControls.ts       Painel HTML de zoom in/out, Center map e ajuda curta de navegação
   ui/ScenarioPanel.ts        Painel HTML do cenário: briefing, objetivos, progresso, ticks e resultado
-  ui/ObjectivesPanel.ts      Painel estático legado com objetivos do fluxo MVP
-  ui/AdvisorPanel.ts         Painel HTML do advisor: contexto do cenário, Analyze city, plano, Approve bloqueável, after-action report e Reject
-  ui/SaveLoadControls.ts    Painel HTML de Save/Load com feedback de storage
+  ui/ScenarioSelector.ts     Seleção HTML de cenário/dificuldade e início de cidade determinística
+  ui/MetricsPanel.ts         Painel HTML informativo de métricas da sessão
+  ui/AdvisorPanel.ts          Painel HTML do advisor: contexto do cenário, Analyze city, plano, Approve bloqueável, after-action report e Reject
   main.ts                   Arranque e mensagem de erro de carregamento
   style.css                 Layout da página
 public/assets/prototype/    Apenas sete PNGs e aviso de licenciamento
@@ -199,5 +202,6 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 - [Plano da Fase 23](documentation/phase-23-development-plan.md)
 - [Plano da Fase 24](documentation/phase-24-development-plan.md)
 - [Plano da Fase 25](documentation/phase-25-development-plan.md)
+- [Checklist de playtest da Fase 25](documentation/phase-25-playtest-checklist.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)

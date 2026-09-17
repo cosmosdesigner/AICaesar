@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { createCityState, getTile, type CityState } from '../simulation/CityState';
 import type { LoadResult, SaveResult } from '../persistence/CitySave';
 import { getPopulationStats, getWorkforceStats } from '../simulation/Simulation';
@@ -15,7 +15,19 @@ const doubles = vi.hoisted(() => ({
   buildPanelDestroy: vi.fn(),
   cameraControlsDestroy: vi.fn(),
   scenarioPanelDestroy: vi.fn(),
+  scenarioSelectorDestroy: vi.fn(),
+  metricsPanelDestroy: vi.fn(),
   eventPanelDestroy: vi.fn(),
+  scenarioPanelInstances: [] as Array<{
+    update: Mock;
+    setDefinition: Mock;
+  }>,
+  selectorInstances: [] as Array<{
+    onStart: (selection: { readonly scenarioId: 'founding-settlement' | 'merchant-quarter' | 'resilient-province'; readonly difficulty: 'easy' | 'normal' }) => void;
+  }>,
+  metricsPanelInstances: [] as Array<{
+    update: Mock;
+  }>,
   simulationControlsDestroy: vi.fn(),
   advisorDestroy: vi.fn(),
   saveLoadControlsDestroy: vi.fn(),
@@ -171,13 +183,43 @@ vi.mock('../ui/CameraControls', () => ({
     }
   },
 }));
-
 vi.mock('../ui/ScenarioPanel', () => ({
   ScenarioPanel: class ScenarioPanel {
     update = vi.fn();
+    setDefinition = vi.fn();
     destroy = doubles.scenarioPanelDestroy;
+
+    constructor() {
+      doubles.scenarioPanelInstances.push({ update: this.update, setDefinition: this.setDefinition });
+    }
   },
 }));
+
+vi.mock('../ui/ScenarioSelector', () => ({
+  ScenarioSelector: class ScenarioSelector {
+    destroy = doubles.scenarioSelectorDestroy;
+
+    constructor(
+      _host: HTMLElement,
+      _selection: unknown,
+      onStart: (selection: { readonly scenarioId: 'founding-settlement' | 'merchant-quarter' | 'resilient-province'; readonly difficulty: 'easy' | 'normal' }) => void,
+    ) {
+      doubles.selectorInstances.push({ onStart });
+    }
+  },
+}));
+
+vi.mock('../ui/MetricsPanel', () => ({
+  MetricsPanel: class MetricsPanel {
+    update = vi.fn();
+    destroy = doubles.metricsPanelDestroy;
+
+    constructor() {
+      doubles.metricsPanelInstances.push({ update: this.update });
+    }
+  },
+}));
+
 
 vi.mock('../ui/EventPanel', () => ({
   EventPanel: class EventPanel {
@@ -239,6 +281,9 @@ describe('startGame camera and cleanup', () => {
     doubles.mapInstances.length = 0;
     doubles.buildPanelInstances.length = 0;
     doubles.cameraControlsInstances.length = 0;
+    doubles.scenarioPanelInstances.length = 0;
+    doubles.selectorInstances.length = 0;
+    doubles.metricsPanelInstances.length = 0;
     doubles.advisorInstances.length = 0;
     doubles.saveLoadControlInstances.length = 0;
     doubles.persistenceSave.mockReturnValue({ ok: true, message: 'City saved locally.' });
@@ -280,6 +325,8 @@ describe('startGame camera and cleanup', () => {
     expect(doubles.simulationControlsDestroy).toHaveBeenCalledOnce();
     expect(doubles.buildPanelDestroy).toHaveBeenCalledOnce();
     expect(doubles.scenarioPanelDestroy).toHaveBeenCalledOnce();
+    expect(doubles.scenarioSelectorDestroy).toHaveBeenCalledOnce();
+    expect(doubles.metricsPanelDestroy).toHaveBeenCalledOnce();
     expect(doubles.eventPanelDestroy).toHaveBeenCalledOnce();
     expect(doubles.advisorDestroy).toHaveBeenCalledOnce();
     expect(doubles.saveLoadControlsDestroy).toHaveBeenCalledOnce();
@@ -389,6 +436,94 @@ describe('startGame camera and cleanup', () => {
       .filter((building) => building.type === 'house')
       .map(({ x, y, level, population }) => ({ x, y, level, population }))).toEqual(seedOccupancy);
     expect(getPopulationStats(resetCity)).toEqual({ ...seedStats, lastChange: 0 });
+    cleanup();
+  });
+
+  it('starts the selected scenario and difficulty, resets that profile, invalidates the advisor, and preserves terminal blocking', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const selector = doubles.selectorInstances[0];
+    const panel = doubles.buildPanelInstances[0];
+    const scenarioPanel = doubles.scenarioPanelInstances[0];
+    const metricsPanel = doubles.metricsPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (selector === undefined || panel === undefined || scenarioPanel === undefined || metricsPanel === undefined) {
+      throw new Error('Expected Phase 25 scenario panels.');
+    }
+
+    selector.onStart({ scenarioId: 'merchant-quarter', difficulty: 'easy' });
+    const selectedCity = panel.update.mock.lastCall?.[0] as CityState;
+    expect(selectedCity.resources.money).toBe(550);
+    expect(scenarioPanel.setDefinition).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: 'merchant-quarter', initialMoney: 550, maxTicks: 900, loseBelowMoney: 0,
+    }));
+    expect(metricsPanel.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      scenarioId: 'merchant-quarter', difficulty: 'easy', buildingsConstructed: 0,
+    }));
+    expect(doubles.advisorInstances[0]?.invalidateForCityChange).toHaveBeenLastCalledWith(
+      'Advisor plan and report cleared for a fresh city.',
+    );
+    expect(map.fitCamera).toHaveBeenCalledTimes(2);
+
+    const terminalTarget = selectedCity.buildings.find((building) => building.type === 'road');
+    if (terminalTarget === undefined) throw new Error('Expected selected scenario road.');
+    selectedCity.resources.money = -1;
+    const before = JSON.stringify(selectedCity);
+    map.toLocal.mockImplementation((_global, _container, out) => {
+      out.x = (terminalTarget.x - terminalTarget.y) * 60;
+      out.y = (terminalTarget.x + terminalTarget.y) * 30;
+      return out;
+    });
+    doubles.selectedTool = 'bulldoze';
+    doubles.stageHandlers.get('pointerdown')?.({
+      button: 0,
+      global: { x: 320, y: 180 },
+      preventDefault: vi.fn(),
+    });
+    expect(JSON.stringify(selectedCity)).toBe(before);
+    expect(panel.update).toHaveBeenLastCalledWith(
+      selectedCity,
+      'Defeat: the settlement treasury fell below 0.',
+      false,
+      false,
+      false,
+      false,
+      { buildBlocked: true },
+    );
+
+    panel.onReset();
+    const resetCity = panel.update.mock.lastCall?.[0] as CityState;
+    expect(resetCity).not.toBe(selectedCity);
+    expect(resetCity).toMatchObject({ resources: { money: 550 }, simulation: { tick: 0 } });
+    expect(metricsPanel.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      scenarioId: 'merchant-quarter', difficulty: 'easy', buildingsConstructed: 0,
+    }));
+    expect(map.fitCamera).toHaveBeenCalledTimes(3);
+    cleanup();
+  });
+
+  it('records only successful player builds in session metrics', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const metricsPanel = doubles.metricsPanelInstances[0];
+    if (metricsPanel === undefined) throw new Error('Expected metrics panel.');
+
+    doubles.stageHandlers.get('pointerdown')?.({
+      button: 0,
+      global: { x: 320, y: 180 },
+      preventDefault: vi.fn(),
+    });
+    expect(metricsPanel.update).toHaveBeenLastCalledWith(expect.objectContaining({ buildingsConstructed: 1 }));
+    doubles.stageHandlers.get('pointerdown')?.({
+      button: 0,
+      global: { x: 320, y: 180 },
+      preventDefault: vi.fn(),
+    });
+    expect(metricsPanel.update).toHaveBeenLastCalledWith(expect.objectContaining({ buildingsConstructed: 1 }));
     cleanup();
   });
 

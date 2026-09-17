@@ -10,6 +10,7 @@ import type { ScenarioProgress } from '../scenario/Scenario';
 export interface AdvisorPanelOptions {
   readonly provider?: AdvisorProvider;
   readonly onApprovePlan?: (plan: AdvisorPlan) => AdvisorApprovalResult;
+  readonly onRejectPlan?: () => void;
   readonly getScenarioContext?: () => string;
   readonly getScenarioProgress?: () => ScenarioProgress;
   readonly isApprovalBlocked?: () => boolean;
@@ -102,6 +103,7 @@ export class AdvisorPanel {
     reject.textContent = 'Reject';
     reject.title = 'Reject the current advisor plan without changing the city.';
     reject.addEventListener('click', () => {
+      if (this.plan !== undefined) this.options.onRejectPlan?.();
       this.plan = undefined;
       this.report = undefined;
       this.renderPlan();
