@@ -187,8 +187,10 @@ describe('CityAnalyzer', () => {
         food_distribution_shortage: 3,
         worker_shortage: 4,
         road_access_missing: 5,
-        low_desirability: 6,
-        low_money: 7,
+        event_active: 6,
+        imperial_request: 7,
+        low_desirability: 8,
+        low_money: 9,
       } as const;
       return severityOrder[a.severity] - severityOrder[b.severity]
         || typeOrder[a.type] - typeOrder[b.type]

@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 20 — desirability e qualidade urbana**: mapa isométrico 30×30, construção manual de roads/houses/wells/farms/granaries/markets e amenities garden/plaza/fountain, rede principal e serviços por distância BFS em estradas, modelo puro e determinístico de desirability local por distância Manhattan, população, workers, finanças, cenário, advisor mock local, execução transacional validada de planos aprovados, overlays de água/comida/rede viária/desirability, navegação de câmara e balanço financeiro determinístico.
+**Fase 21 — eventos e pressão de jogo**: mapa isométrico 30×30, construção manual de roads/houses/wells/farms/granaries/markets e amenities garden/plaza/fountain, rede principal e serviços por distância BFS em estradas, desirability local determinística, população, workers, finanças, eventos temporários determinísticos, pedidos do imperador, cenário, advisor mock local, execução transaccional validada de planos aprovados e overlays de água/comida/rede viária/desirability.
 
 ## Executar localmente
 
@@ -48,6 +48,18 @@ npm run preview
 - Câmara centrada/enquadrada no arranque e em **Reset**; redimensionamento, construção, overlays, ticks e advisor preservam pan/zoom atuais.
 - Painel **Map navigation** com **Zoom in**, **Zoom out** e **Center map**, tooltips e ajuda curta: `Pan: middle-drag or Space + left-drag`; `Zoom: mouse wheel or controls`. O zoom da câmara é limitado a **2x** para não ampliar em excesso os sprites temporários de baixa resolução.
 
+
+## Eventos e pressão de jogo
+
+A simulação usa apenas o relógio de ticks e um calendário com seed fixa (`21`), por isso o mesmo estado produz sempre os mesmos warnings, eventos e impactos. O fluxo é `warning → active → resolved`; o Reset limpa o estado e as mensagens.
+
+- Uma **drought** publica warning no tick 24, decorre nos ticks 30–44 e reduz a produção das farms para 50%; a produção normaliza no fim.
+- Uma **epidemic** publica warning no tick 54, decorre nos ticks 60–71, remove no máximo um residente por casa ocupada ao iniciar e suspende crescimento durante o evento.
+- Um **imperial request** é emitido no tick 78: pede 10 food até ao tick 96, paga +35 money se cumprido e aplica -25 money se falhar. O botão **Fulfil request** consome primeiro stock de granaries e depois de markets, em ordem determinística.
+- Um **fire** publica warning no tick 84 e, nos ticks 90–97, suprime temporariamente o primeiro workplace por posição. Não destrói o edifício nem o inventário; a actividade é restaurada ao terminar.
+- O painel **Events** mostra warnings, eventos activos, prazo/stock do pedido e as mensagens recentes. O analyzer e o advisor mock incluem a pressão actual, mas o advisor não recebe novas actions.
+
+Estes eventos são pressão moderada de protótipo; não existem ainda combate, safety/prefecture, walkers, múltiplos goods, comércio externo ou save/load.
 
 ## Demo rápido de 5 minutos
 
@@ -166,5 +178,6 @@ A relva vem de `land1a/`; a estrada usa pavimento de `ground/`, pois `way/` na f
 - [Plano da Fase 18](documentation/phase-18-development-plan.md)
 - [Plano da Fase 19](documentation/phase-19-development-plan.md)
 - [Plano da Fase 20](documentation/phase-20-development-plan.md)
+- [Plano da Fase 21](documentation/phase-21-development-plan.md)
 - [Fases de implementação](documentation/implementation-phases.md)
 - [Notas de referência Caesaria](documentation/caesaria-reference.md)

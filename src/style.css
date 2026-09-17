@@ -99,6 +99,31 @@ main { padding: 0 16px; }
 .scenario-objective-incomplete {
   color: #d6c18b;
 }
+.event-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 24px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  background: #182522;
+  border: 1px solid #35463b;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.event-panel h2,
+.event-panel h3 {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 16px;
+}
+.event-panel h3 { color: #b9ba8e; font-size: 13px; }
+.event-panel ul { flex: 1 1 240px; margin: 0 0 0 20px; padding: 0; }
+.event-panel p { flex: 1 1 320px; color: #d6c18b; }
+.event-panel button { align-self: center; }
+.event-warning { color: #e3a93b; }
+.event-active { color: #e38b6b; }
+.event-status { flex-basis: 100%; min-height: 1.5em; color: #d6c18b; }
 .build-tools { display: flex; flex-wrap: wrap; gap: 8px; }
 .build-stats,
 .finance-stats {

@@ -1,5 +1,11 @@
 import { type Building, type CityState } from './CityState';
 import {
+  advanceEvents,
+  getDroughtProductionMultiplier,
+  isBuildingSuppressed,
+  isEpidemicActive,
+} from '../events/Events';
+import {
   getDistanceToBuilding,
   getRoadDistances,
   getRoadNetwork,
@@ -108,6 +114,7 @@ export interface FinanceStats {
 
 export function simulateTick(city: CityState): void {
   city.simulation.tick += 1;
+  const eventPopulationChange = advanceEvents(city);
   const network = getRoadNetwork(city);
   assignWorkers(city, network);
   produceFood(city, network);
@@ -115,12 +122,13 @@ export function simulateTick(city: CityState): void {
 
   const waterCoverage = getWaterCoveredTiles(city, network);
   const shouldConsumeFood = city.simulation.tick % HOUSE_FOOD_CONSUMPTION_INTERVAL === 0;
+  const growthBlocked = isEpidemicActive(city);
 
   const houses = city.buildings
     .filter((building) => building.type === 'house')
     .sort(compareBuildingsByPosition);
 
-  let populationLastChange = 0;
+  let populationLastChange = eventPopulationChange;
   for (const building of houses) {
     building.hasRoadAccess = hasAdjacentRoad(city, building, network);
     building.hasWater = waterCoverage.has(getTileKey(building.x, building.y));
@@ -142,7 +150,7 @@ export function simulateTick(city: CityState): void {
     };
     updateHouseLevel(building, services);
     clampHousePopulation(building);
-    updateHousePopulation(city, building, services);
+    updateHousePopulation(city, building, services, growthBlocked);
     populationLastChange += getHousePopulation(building) - previousPopulation;
   }
   city.simulation.population.lastChange = populationLastChange;
@@ -237,7 +245,8 @@ export function assignWorkers(city: CityState, network = getRoadNetwork(city)): 
 
   for (const workplace of workplaces) {
     const workersRequired = getWorkersRequired(workplace.type);
-    if (isBuildingOnRoadNetwork(city, workplace, network) && remainingWorkers >= workersRequired) {
+    if (!isBuildingSuppressed(city, workplace)
+      && isBuildingOnRoadNetwork(city, workplace, network) && remainingWorkers >= workersRequired) {
       workplace.active = true;
       remainingWorkers -= workersRequired;
     } else {
@@ -282,7 +291,8 @@ export function getWorkforceStats(city: CityState, network = getRoadNetwork(city
   for (const workplace of getSortedWorkplaces(city)) {
     const required = getWorkersRequired(workplace.type);
     workersRequired += required;
-    if (isBuildingOnRoadNetwork(city, workplace, network) && remainingWorkers >= required) {
+    if (!isBuildingSuppressed(city, workplace)
+      && isBuildingOnRoadNetwork(city, workplace, network) && remainingWorkers >= required) {
       remainingWorkers -= required;
       workersAssigned += required;
       activeWorkplaces += 1;
@@ -379,9 +389,11 @@ export function getMarketFoodDemand(market: Building): number {
 }
 
 export function getMarketSupplyCandidates(city: CityState, market: Building, network = getRoadNetwork(city)): Building[] {
-  if (!isBuildingOnRoadNetwork(city, market, network) || market.active !== true) return [];
+  if (isBuildingSuppressed(city, market)
+    || !isBuildingOnRoadNetwork(city, market, network) || market.active !== true) return [];
   return getReachableBuildings(city, market, 'granary', MARKET_SUPPLY_RADIUS, network)
-    .filter((granary) => granary.active === true && getStoredFood(granary) > 0);
+    .filter((granary) => !isBuildingSuppressed(city, granary)
+      && granary.active === true && getStoredFood(granary) > 0);
 }
 
 export function getFoodStats(city: CityState, network = getRoadNetwork(city)): FoodStats {
@@ -420,10 +432,11 @@ function produceFood(city: CityState, network: RoadNetwork): void {
     .sort(compareBuildingsByPosition);
   if (granaries.length === 0) return;
 
+  const farmProduction = Math.max(0, Math.floor(FARM_FOOD_PER_TICK * getDroughtProductionMultiplier(city)));
   const farms = getActiveBuildings(city, 'farm', network)
     .sort(compareBuildingsByPosition);
   for (let farmIndex = 0; farmIndex < farms.length; farmIndex++) {
-    let remainingFood = FARM_FOOD_PER_TICK;
+    let remainingFood = farmProduction;
     for (const granary of granaries) {
       const space = GRANARY_FOOD_CAPACITY - getStoredFood(granary);
       if (space <= 0) continue;
@@ -504,11 +517,16 @@ function clampHousePopulation(building: Building): void {
   building.population = Math.min(getHouseCapacity(building), getHousePopulation(building));
 }
 
-function updateHousePopulation(city: CityState, building: Building, services: HouseServices): void {
+function updateHousePopulation(
+  city: CityState,
+  building: Building,
+  services: HouseServices,
+  growthBlocked: boolean,
+): void {
   const population = getHousePopulation(building);
   const capacity = getHouseCapacity(building);
   if (services.road && services.water && services.food) {
-    if (city.simulation.tick % POPULATION_GROWTH_INTERVAL_TICKS !== 0 || population >= capacity) return;
+    if (growthBlocked || city.simulation.tick % POPULATION_GROWTH_INTERVAL_TICKS !== 0 || population >= capacity) return;
     building.population = population + 1;
     return;
   }
@@ -575,7 +593,8 @@ function getRoadCoverage(
 
 function getActiveBuildings(city: CityState, type: Building['type'], network: RoadNetwork): Building[] {
   return city.buildings.filter((building) => (
-    building.type === type && building.active === true && isBuildingOnRoadNetwork(city, building, network)
+    building.type === type && building.active === true && !isBuildingSuppressed(city, building)
+      && isBuildingOnRoadNetwork(city, building, network)
   ));
 }
 
@@ -589,7 +608,7 @@ function countBuildings(city: CityState, type: Building['type']): number {
 
 function countActiveBuildings(city: CityState, type: Building['type'], network: RoadNetwork): number {
   return city.buildings.reduce((total, building) => (
-    total + (building.type === type && building.active === true
+    total + (building.type === type && building.active === true && !isBuildingSuppressed(city, building)
       && isBuildingOnRoadNetwork(city, building, network) ? 1 : 0)
   ), 0);
 }

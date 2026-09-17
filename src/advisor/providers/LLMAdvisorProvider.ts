@@ -46,5 +46,6 @@ export function buildAdvisorPrompt(input: AdvisorProviderInput): string {
     'Plan estimatedCost must equal the sum of action estimatedCost values.',
     `CityStateSummary: ${JSON.stringify(input.summary)}`,
     `CityIssue[]: ${JSON.stringify(input.issues)}`,
+    'Use the optional events and imperialRequest fields in CityStateSummary to explain temporary pressure. Do not invent event actions; use only the allowed action types.',
   ].join('\n');
 }

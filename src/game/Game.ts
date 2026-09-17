@@ -12,7 +12,9 @@ import {
 } from '../scenario/Scenario';
 import { createCityState, placeBuilding, type BuildResult } from '../simulation/CityState';
 import { assignWorkers, simulateTick } from '../simulation/Simulation';
+import { fulfillImperialRequest } from '../events/Events';
 import { BuildPanel, BUILD_LABELS } from '../ui/BuildPanel';
+import { EventPanel } from '../ui/EventPanel';
 import { AdvisorPanel } from '../ui/AdvisorPanel';
 import { ScenarioPanel } from '../ui/ScenarioPanel';
 import { SimulationControls } from '../ui/SimulationControls';
@@ -96,6 +98,11 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   );
   simulationControls.update(paused, speed);
   const scenarioPanel = new ScenarioPanel(panelHost, FOUNDING_SETTLEMENT_SCENARIO);
+  const eventPanel = new EventPanel(panelHost, () => city, () => {
+    const fulfilled = fulfillImperialRequest(city);
+    if (fulfilled) refreshCity('Imperial request fulfilled.');
+    return fulfilled;
+  });
   const advisor = new AdvisorPanel(panelHost, () => city, {
     getScenarioContext: () => getScenarioContext(evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO)),
     isApprovalBlocked: isScenarioTerminal,
@@ -180,6 +187,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       simulationControls.update(paused, speed);
     }
     scenarioPanel.update(scenarioProgress);
+    eventPanel.update(city);
     advisor.updateScenarioContext();
     panel.update(
       city,
@@ -281,6 +289,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     cameraControls.destroy();
     simulationControls.destroy();
     scenarioPanel.destroy();
+    eventPanel.destroy();
     advisor.destroy();
     app.destroy(true, { children: true });
   };

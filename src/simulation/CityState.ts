@@ -1,5 +1,6 @@
 import { getHouseSpecification } from './HouseSpecification';
 import type { BuildingType, Tile } from './Tile';
+import { createEventState, type EventState } from '../events/Events';
 
 export const MAP_WIDTH = 30;
 export const MAP_HEIGHT = 30;
@@ -51,6 +52,7 @@ export interface SimulationState {
   tick: number;
   finance: FinanceState;
   population: PopulationState;
+  events?: EventState;
 }
 
 export interface CityState {
@@ -77,7 +79,12 @@ export function createCityState(): CityState {
     tiles,
     buildings: [],
     resources: { money: INITIAL_MONEY },
-    simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 }, population: { lastChange: 0 } },
+    simulation: {
+      tick: 0,
+      finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 },
+      population: { lastChange: 0 },
+      events: createEventState(),
+    },
   };
 
   for (let y = 0; y < MAP_HEIGHT; y++) {

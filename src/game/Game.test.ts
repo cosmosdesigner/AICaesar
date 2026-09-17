@@ -14,6 +14,7 @@ const doubles = vi.hoisted(() => ({
   buildPanelDestroy: vi.fn(),
   cameraControlsDestroy: vi.fn(),
   scenarioPanelDestroy: vi.fn(),
+  eventPanelDestroy: vi.fn(),
   simulationControlsDestroy: vi.fn(),
   advisorDestroy: vi.fn(),
   observe: vi.fn(),
@@ -163,6 +164,13 @@ vi.mock('../ui/ScenarioPanel', () => ({
   },
 }));
 
+vi.mock('../ui/EventPanel', () => ({
+  EventPanel: class EventPanel {
+    update = vi.fn();
+    destroy = doubles.eventPanelDestroy;
+  },
+}));
+
 vi.mock('../ui/SimulationControls', () => ({
   SimulationControls: class SimulationControls {
     update = vi.fn();
@@ -228,6 +236,7 @@ describe('startGame camera and cleanup', () => {
     expect(doubles.simulationControlsDestroy).toHaveBeenCalledOnce();
     expect(doubles.buildPanelDestroy).toHaveBeenCalledOnce();
     expect(doubles.scenarioPanelDestroy).toHaveBeenCalledOnce();
+    expect(doubles.eventPanelDestroy).toHaveBeenCalledOnce();
     expect(doubles.advisorDestroy).toHaveBeenCalledOnce();
     expect(doubles.appDestroy).toHaveBeenCalledWith(true, { children: true });
   });

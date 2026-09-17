@@ -12,6 +12,7 @@ import {
 } from '../simulation/Simulation';
 import { getHouseStatus } from '../simulation/HouseSpecification';
 import { getRoadNetwork, isBuildingOnRoadNetwork, type RoadNetwork } from '../simulation/RoadNetwork';
+import { getEventSummary, getImperialRequestSummary, type EventSummary } from '../events/Events';
 
 export type CityIssueType =
   | 'water_shortage'
@@ -20,6 +21,8 @@ export type CityIssueType =
   | 'food_distribution_shortage'
   | 'worker_shortage'
   | 'road_access_missing'
+  | 'event_active'
+  | 'imperial_request'
   | 'low_desirability'
   | 'low_money';
 
@@ -47,6 +50,8 @@ export interface CityStateSummary {
   readonly workersAvailable: number;
   readonly workersRequired: number;
   readonly workerShortage: number;
+  readonly events?: readonly EventSummary[];
+  readonly imperialRequest?: ReturnType<typeof getImperialRequestSummary>;
 }
 
 const SEVERITY_ORDER: Readonly<Record<CityIssueSeverity, number>> = {
@@ -62,14 +67,18 @@ const ISSUE_TYPE_ORDER: Readonly<Record<CityIssueType, number>> = {
   food_distribution_shortage: 3,
   worker_shortage: 4,
   road_access_missing: 5,
-  low_desirability: 6,
-  low_money: 7,
+  event_active: 6,
+  imperial_request: 7,
+  low_desirability: 8,
+  low_money: 9,
 };
 
 export function summarizeCity(city: CityState, network = getRoadNetwork(city)): CityStateSummary {
   const housingStats = getHousingStats(city, network);
   const foodStats = getFoodStats(city, network);
   const workforceStats = getWorkforceStats(city, network);
+  const events = getEventSummary(city);
+  const imperialRequest = getImperialRequestSummary(city);
 
   return {
     tick: city.simulation.tick,
@@ -85,6 +94,8 @@ export function summarizeCity(city: CityState, network = getRoadNetwork(city)): 
     workersAvailable: workforceStats.workersAvailable,
     workersRequired: workforceStats.workersRequired,
     workerShortage: workforceStats.workerShortage,
+    events,
+    ...(imperialRequest === undefined ? {} : { imperialRequest }),
   };
 }
 
@@ -176,6 +187,39 @@ export function analyzeCity(city: CityState): CityIssue[] {
       affectedTiles: toTiles(housesWithLowDesirability),
       explanation: `Desirability baixa em ${housesWithLowDesirability.length} casa${housesWithLowDesirability.length === 1 ? '' : 's'}.`,
       cause: causes.join(' '),
+    });
+  }
+
+  const eventSummaries = getEventSummary(city);
+  for (const event of eventSummaries.filter((candidate) => candidate.status === 'active')) {
+    const target = event.targetBuildingId === undefined
+      ? undefined
+      : city.buildings.find((building) => building.id === event.targetBuildingId);
+    issues.push({
+      type: 'event_active',
+      severity: event.type === 'epidemic' ? 'high' : 'medium',
+      affectedTiles: target === undefined ? [] : [{ x: target.x, y: target.y }],
+      explanation: `${event.type} active (${event.ticksRemaining} ticks remaining).`,
+      cause: event.type === 'drought'
+        ? 'Farm production is temporarily reduced.'
+        : event.type === 'epidemic'
+          ? 'Population growth is temporarily suspended.'
+          : target === undefined
+            ? 'No workplace was selected by the fire.'
+            : `${event.targetBuildingId} is temporarily suppressed.`,
+    });
+  }
+
+  const imperialRequest = getImperialRequestSummary(city);
+  if (imperialRequest?.status === 'pending') {
+    issues.push({
+      type: 'imperial_request',
+      severity: imperialRequest.ticksRemaining <= 3 ? 'high' : 'medium',
+      affectedTiles: [],
+      explanation: `Imperial request: deliver ${imperialRequest.requestedFood} food by tick ${imperialRequest.dueTick}.`,
+      cause: imperialRequest.foodStock >= imperialRequest.requestedFood
+        ? `${imperialRequest.foodStock} food is available; reward is +${imperialRequest.rewardMoney} money.`
+        : `Only ${imperialRequest.foodStock} food is available; failure costs ${imperialRequest.failurePenalty} money.`,
     });
   }
 

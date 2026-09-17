@@ -113,6 +113,10 @@ function createActionForIssue(summary: CityStateSummary, issue: CityIssue): Advi
         'Add road access near the first affected economic building.',
         getAdjacentTarget(issue.affectedTiles[0]),
       );
+    case 'event_active':
+      return createWaitAction(`React to the active event before expanding: ${issue.cause}`);
+    case 'imperial_request':
+      return createWaitAction('Review the imperial request and fulfil it from the event panel when enough food is available.');
     case 'low_desirability':
       return createWaitAction('Improve local urban quality manually with gardens, plazas or fountains.');
     case 'low_money':

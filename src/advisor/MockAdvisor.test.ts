@@ -88,4 +88,27 @@ describe('MockAdvisor', () => {
     }]);
     expect(plan.estimatedCost).toBe(0);
   });
+
+  it('reacts to active events without inventing a new action type', () => {
+    const city = createEmptyCity();
+    city.simulation.events = {
+      seed: 21,
+      active: [{
+        id: 'drought-test',
+        type: 'drought',
+        status: 'active',
+        startTick: 2,
+        endTick: 5,
+        message: 'Drought started.',
+        productionMultiplier: 0.5,
+      }],
+      history: [],
+      processed: [],
+    };
+
+    const plan = createAdvisorPlan(city);
+
+    expect(plan.summary).toContain('drought active');
+    expect(plan.actions[0]?.type).toBe('wait');
+  });
 });
