@@ -60,6 +60,9 @@ describe('MockAdvisor', () => {
     addBuilding(city, 'road', 4, 1);
     addBuilding(city, 'road', 5, 1);
     addBuilding(city, 'road', 6, 1);
+    for (const [x, y] of [[1, 1], [2, 1], [3, 1], [1, 3], [1, 4]] as const) {
+      addBuilding(city, 'road', x, y);
+    }
     addBuilding(city, 'farm', 4, 2, { active: false });
     addBuilding(city, 'granary', 5, 2, { active: false });
     addBuilding(city, 'market', 6, 2, { active: false });

@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, type Texture } from 'pixi.js';
 import type { MapTextures } from '../assets/AssetManifest';
 import type { Building, CityState } from '../simulation/CityState';
+import { getRoadNetwork } from '../simulation/RoadNetwork';
 import { getFoodCoveredTiles, getTileKey, getWaterCoveredTiles, isWorkplace } from '../simulation/Simulation';
 import { createFittedCamera, type CameraState } from './Camera';
 import { gridToScreen, TILE_HEIGHT, TILE_WIDTH } from './GridMath';
@@ -51,8 +52,15 @@ export class MapRenderer extends Container {
     const renderedBuildings = [...city.buildings].sort((a, b) => (
       (a.x + a.y) - (b.x + b.y) || a.x - b.x
     ));
+    const roadNetwork = options.roadNetworkOverlay === true ? getRoadNetwork(city) : undefined;
     for (const building of renderedBuildings) {
-      buildings.addChild(this.createBuildingSprite(building, options));
+      const sprite = this.createBuildingSprite(building, options);
+      if (building.type === 'road' && roadNetwork !== undefined) {
+        sprite.tint = roadNetwork.mainRoadTiles.has(getTileKey(building.x, building.y))
+          ? 0x65b84a
+          : 0xe87542;
+      }
+      buildings.addChild(sprite);
     }
   }
 
@@ -129,4 +137,5 @@ interface TilePosition {
 interface MapRenderOptions {
   readonly waterOverlay?: boolean;
   readonly foodOverlay?: boolean;
+  readonly roadNetworkOverlay?: boolean;
 }

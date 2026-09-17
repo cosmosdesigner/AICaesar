@@ -44,9 +44,76 @@ describe('CityAnalyzer', () => {
     expect(summarizeCity(city).housesWithoutWater).toBe(1);
   });
 
+  it('distinguishes buildings with no adjacent road from buildings beside an isolated road', () => {
+    const city = createEmptyCity();
+    addBuilding(city, 'road', 0, 0);
+    addBuilding(city, 'road', 1, 0);
+    addBuilding(city, 'farm', 3, 3);
+    addBuilding(city, 'road', 6, 5);
+    addBuilding(city, 'market', 6, 6);
+
+    const issue = analyzeCity(city).find((candidate) => candidate.type === 'road_access_missing');
+
+    expect(issue?.affectedTiles).toEqual([{ x: 3, y: 3 }, { x: 6, y: 6 }]);
+    expect(issue?.cause).toMatch(/sem estrada adjacente/i);
+    expect(issue?.cause).toMatch(/estrada isolada/i);
+  });
+
+  it('reports an isolated house as a road problem rather than a missing water service', () => {
+    const city = createEmptyCity();
+    addBuilding(city, 'road', 0, 0);
+    addBuilding(city, 'road', 1, 0);
+    addBuilding(city, 'road', 6, 5);
+    addBuilding(city, 'house', 6, 6, { level: 2 });
+
+    const issues = analyzeCity(city);
+
+    expect(issues.find((issue) => issue.type === 'road_access_missing')?.affectedTiles)
+      .toEqual([{ x: 6, y: 6 }]);
+    expect(issues.map((issue) => issue.type)).not.toContain('water_shortage');
+    expect(summarizeCity(city).housesWithoutWater).toBe(0);
+  });
+
+  it('explains water outside road reach even when the well is nearby', () => {
+    const city = createEmptyCity();
+    for (const [x, y] of [[0, 2], [0, 3], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [4, 3], [4, 2]] as const) {
+      addBuilding(city, 'road', x, y);
+    }
+    addBuilding(city, 'well', 1, 2);
+    addBuilding(city, 'house', 3, 2, { level: 1 });
+
+    const issues = analyzeCity(city);
+    const issue = issues.find((candidate) => candidate.type === 'water_shortage');
+
+    expect(issue?.affectedTiles).toEqual([{ x: 3, y: 2 }]);
+    expect(issue?.cause).toMatch(/alcance.*rede/i);
+    expect(issues.map((candidate) => candidate.type)).not.toContain('road_access_missing');
+    expect(summarizeCity(city).housesWithoutWater).toBe(1);
+  });
+
+  it('identifies distribution outside road reach despite a stocked nearby market', () => {
+    const city = createEmptyCity();
+    for (const [x, y] of [[0, 2], [0, 3], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [4, 3], [4, 2], [4, 1]] as const) {
+      addBuilding(city, 'road', x, y);
+    }
+    addBuilding(city, 'market', 1, 2, { active: true, storedFood: 8 });
+    addBuilding(city, 'granary', 0, 1, { active: true, storedFood: 12 });
+    addBuilding(city, 'well', 3, 1);
+    addBuilding(city, 'house', 3, 2, { level: 2, hasFood: false });
+
+    const issues = analyzeCity(city);
+    const issue = issues.find((candidate) => candidate.type === 'food_distribution_shortage');
+
+    expect(issue?.affectedTiles).toEqual([{ x: 3, y: 2 }]);
+    expect(issue?.cause).toMatch(/alcance.*rede/i);
+    expect(issues.map((candidate) => candidate.type)).toContain('food_shortage');
+    expect(summarizeCity(city).housesWithoutFood).toBe(1);
+  });
+
   it('detects houses without expected food and missing production', () => {
     const city = createEmptyCity();
     addBuilding(city, 'road', 1, 2);
+    for (let x = 1; x <= 4; x++) addBuilding(city, 'road', x, 3);
     addBuilding(city, 'house', 2, 2, { level: 2, hasFood: false });
     addBuilding(city, 'well', 2, 4);
     addBuilding(city, 'market', 4, 2, { active: true });
@@ -61,6 +128,7 @@ describe('CityAnalyzer', () => {
   it('explains missing food storage before production can feed houses', () => {
     const city = createEmptyCity();
     addBuilding(city, 'road', 1, 2);
+    for (let x = 1; x <= 4; x++) addBuilding(city, 'road', x, 3);
     addBuilding(city, 'house', 2, 2, { level: 2, hasFood: false });
     addBuilding(city, 'well', 2, 4);
     addBuilding(city, 'farm', 4, 2, { active: true });
@@ -73,6 +141,7 @@ describe('CityAnalyzer', () => {
   it('detects distribution failure when granary food cannot reach houses through markets', () => {
     const city = createEmptyCity();
     addBuilding(city, 'road', 1, 2);
+    for (let x = 1; x <= 4; x++) addBuilding(city, 'road', x, 3);
     addBuilding(city, 'house', 2, 2, { level: 2, hasFood: false });
     addBuilding(city, 'well', 2, 4);
     addBuilding(city, 'granary', 4, 2, { active: true, storedFood: 12 });

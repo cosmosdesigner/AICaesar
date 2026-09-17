@@ -151,6 +151,7 @@ describe('AfterActionReport', () => {
   it('generates a report after successful approved execution', () => {
     const city = createEmptyCity();
     addBuilding(city, 'road', 1, 2);
+    for (let x = 1; x <= 3; x++) addBuilding(city, 'road', x, 1);
     addBuilding(city, 'house', 2, 2, { level: 1, hasFood: false });
     const result = approveAdvisorPlan(city, createPlan([
       buildAction('build_well', BUILD_COSTS.well, { x: 3, y: 2 }),

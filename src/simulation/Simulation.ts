@@ -1,4 +1,11 @@
-import { getBuildingAt, getTile, type Building, type CityState } from './CityState';
+import { type Building, type CityState } from './CityState';
+import {
+  getDistanceToBuilding,
+  getRoadDistances,
+  getRoadNetwork,
+  isBuildingOnRoadNetwork,
+  type RoadNetwork,
+} from './RoadNetwork';
 import type { BuildingType } from './Tile';
 import {
   HOUSE_DEGRADE_TICKS,
@@ -100,11 +107,12 @@ export interface FinanceStats {
 
 export function simulateTick(city: CityState): void {
   city.simulation.tick += 1;
-  assignWorkers(city);
-  produceFood(city);
-  restockMarkets(city);
+  const network = getRoadNetwork(city);
+  assignWorkers(city, network);
+  produceFood(city, network);
+  restockMarkets(city, network);
 
-  const waterCoverage = getWaterCoveredTiles(city);
+  const waterCoverage = getWaterCoveredTiles(city, network);
   const shouldConsumeFood = city.simulation.tick % HOUSE_FOOD_CONSUMPTION_INTERVAL === 0;
 
   const houses = city.buildings
@@ -113,10 +121,10 @@ export function simulateTick(city: CityState): void {
 
   let populationLastChange = 0;
   for (const building of houses) {
-    building.hasRoadAccess = hasAdjacentRoad(city, building);
+    building.hasRoadAccess = hasAdjacentRoad(city, building, network);
     building.hasWater = waterCoverage.has(getTileKey(building.x, building.y));
 
-    const market = getHouseFoodMarket(city, building);
+    const market = getHouseFoodMarket(city, building, network);
     if (market) {
       building.hasFood = true;
       if (shouldConsumeFood) market.storedFood = Math.max(0, getStoredFood(market) - 1);
@@ -137,7 +145,7 @@ export function simulateTick(city: CityState): void {
   }
   city.simulation.population.lastChange = populationLastChange;
 
-  assignWorkers(city);
+  assignWorkers(city, network);
   if (city.simulation.tick % FINANCE_INTERVAL_TICKS === 0) applyFinancePeriod(city);
 }
 
@@ -179,59 +187,54 @@ export function applyFinancePeriod(city: CityState): FinanceStats {
   return getFinanceStats(city);
 }
 
-export function hasAdjacentRoad(city: CityState, building: Building): boolean {
-  return getBuildingAt(city, building.x, building.y - 1)?.type === 'road'
-    || getBuildingAt(city, building.x + 1, building.y)?.type === 'road'
-    || getBuildingAt(city, building.x, building.y + 1)?.type === 'road'
-    || getBuildingAt(city, building.x - 1, building.y)?.type === 'road';
+export function hasAdjacentRoad(city: CityState, building: Building, network = getRoadNetwork(city)): boolean {
+  return isBuildingOnRoadNetwork(city, building, network);
 }
 
-export function hasWaterAccess(city: CityState, building: Building): boolean {
-  return getWaterCoverage(city).has(getTileKey(building.x, building.y));
+export function hasWaterAccess(city: CityState, building: Building, network = getRoadNetwork(city)): boolean {
+  return getWaterCoverage(city, network).has(getTileKey(building.x, building.y));
 }
 
-export function getHouseServices(city: CityState, building: Building): HouseServices {
+export function getHouseServices(city: CityState, building: Building, network = getRoadNetwork(city)): HouseServices {
   return {
-    road: hasAdjacentRoad(city, building),
-    water: hasWaterAccess(city, building),
-    food: building.hasFood === true,
+    road: hasAdjacentRoad(city, building, network),
+    water: hasWaterAccess(city, building, network),
+    food: building.hasFood === true && getHouseFoodMarket(city, building, network) !== undefined,
   };
 }
 
-export function getWaterCoveredTiles(city: CityState): Set<string> {
-  return getWaterCoverage(city);
+export function getWaterCoveredTiles(city: CityState, network = getRoadNetwork(city)): Set<string> {
+  return getWaterCoverage(city, network);
 }
 
-export function getFoodCoveredTiles(city: CityState): Set<string> {
-  const coverage = new Set<string>();
-
-  for (const market of getActiveBuildings(city, 'market')) {
-    if (getStoredFood(market) <= 0) continue;
-    addRadiusCoverage(city, coverage, market, MARKET_FOOD_RADIUS);
-  }
-
-  return coverage;
+export function getFoodCoveredTiles(city: CityState, network = getRoadNetwork(city)): Set<string> {
+  return getRoadCoverage(
+    city,
+    getActiveBuildings(city, 'market', network).filter((market) => getStoredFood(market) > 0),
+    MARKET_FOOD_RADIUS,
+    network,
+  );
 }
 
-export function getGranaryFoodCapacity(city: CityState): number {
-  return countActiveBuildings(city, 'granary') * GRANARY_FOOD_CAPACITY;
+export function getGranaryFoodCapacity(city: CityState, network = getRoadNetwork(city)): number {
+  return countActiveBuildings(city, 'granary', network) * GRANARY_FOOD_CAPACITY;
 }
 
-export function getMarketFoodCapacity(city: CityState): number {
-  return countActiveBuildings(city, 'market') * MARKET_FOOD_CAPACITY;
+export function getMarketFoodCapacity(city: CityState, network = getRoadNetwork(city)): number {
+  return countActiveBuildings(city, 'market', network) * MARKET_FOOD_CAPACITY;
 }
 
-export function getFoodCapacity(city: CityState): number {
-  return getGranaryFoodCapacity(city) + getMarketFoodCapacity(city);
+export function getFoodCapacity(city: CityState, network = getRoadNetwork(city)): number {
+  return getGranaryFoodCapacity(city, network) + getMarketFoodCapacity(city, network);
 }
 
-export function assignWorkers(city: CityState): void {
+export function assignWorkers(city: CityState, network = getRoadNetwork(city)): void {
   let remainingWorkers = Math.floor(getPopulation(city) * WORKFORCE_RATIO);
   const workplaces = getSortedWorkplaces(city);
 
   for (const workplace of workplaces) {
     const workersRequired = getWorkersRequired(workplace.type);
-    if (remainingWorkers >= workersRequired) {
+    if (isBuildingOnRoadNetwork(city, workplace, network) && remainingWorkers >= workersRequired) {
       workplace.active = true;
       remainingWorkers -= workersRequired;
     } else {
@@ -264,7 +267,7 @@ export function getPopulationStats(city: CityState): PopulationStats {
   };
 }
 
-export function getWorkforceStats(city: CityState): WorkforceStats {
+export function getWorkforceStats(city: CityState, network = getRoadNetwork(city)): WorkforceStats {
   const population = getPopulation(city);
   const workersAvailable = Math.floor(population * WORKFORCE_RATIO);
   let remainingWorkers = workersAvailable;
@@ -276,7 +279,7 @@ export function getWorkforceStats(city: CityState): WorkforceStats {
   for (const workplace of getSortedWorkplaces(city)) {
     const required = getWorkersRequired(workplace.type);
     workersRequired += required;
-    if (remainingWorkers >= required) {
+    if (isBuildingOnRoadNetwork(city, workplace, network) && remainingWorkers >= required) {
       remainingWorkers -= required;
       workersAssigned += required;
       activeWorkplaces += 1;
@@ -305,8 +308,10 @@ export function getWorkersRequired(type: BuildingType): number {
   return isWorkplace(type) ? WORKERS_REQUIRED[type] : 0;
 }
 
-export function getHousingStats(city: CityState): HousingStats {
-  const waterCoverage = getWaterCoverage(city);
+export function getHousingStats(city: CityState, network = getRoadNetwork(city)): HousingStats {
+  const waterCoverage = getWaterCoverage(city, network);
+  // Food flags record the last tick, including stock consumed or workers reassigned then.
+  const foodReach = getFoodCoveredTiles(city, network);
   let totalHouses = 0;
   let housesWithRoadAccess = 0;
   let housesWithWater = 0;
@@ -322,9 +327,9 @@ export function getHousingStats(city: CityState): HousingStats {
 
     totalHouses += 1;
     const services: HouseServices = {
-      road: hasAdjacentRoad(city, building),
+      road: hasAdjacentRoad(city, building, network),
       water: waterCoverage.has(getTileKey(building.x, building.y)),
-      food: building.hasFood === true,
+      food: building.hasFood === true && foodReach.has(getTileKey(building.x, building.y)),
     };
     const status = getHouseStatus(building.level, services);
     if (services.road) housesWithRoadAccess += 1;
@@ -369,23 +374,19 @@ export function getMarketFoodDemand(market: Building): number {
   return Math.max(0, MARKET_FOOD_CAPACITY - getStoredFood(market));
 }
 
-export function getMarketSupplyCandidates(city: CityState, market: Building): Building[] {
-  return getActiveBuildings(city, 'granary')
-    .filter((granary) => getStoredFood(granary) > 0
-      && getManhattanDistance(granary, market) <= MARKET_SUPPLY_RADIUS)
-    .sort((a, b) => (
-      getManhattanDistance(a, market) - getManhattanDistance(b, market)
-      || compareBuildingsByPosition(a, b)
-    ));
+export function getMarketSupplyCandidates(city: CityState, market: Building, network = getRoadNetwork(city)): Building[] {
+  if (!isBuildingOnRoadNetwork(city, market, network) || market.active !== true) return [];
+  return getReachableBuildings(city, market, 'granary', MARKET_SUPPLY_RADIUS, network)
+    .filter((granary) => granary.active === true && getStoredFood(granary) > 0);
 }
 
-export function getFoodStats(city: CityState): FoodStats {
-  const housingStats = getHousingStats(city);
-  const foodCoverage = getFoodCoveredTiles(city);
+export function getFoodStats(city: CityState, network = getRoadNetwork(city)): FoodStats {
+  const housingStats = getHousingStats(city, network);
+  const foodCoverage = getFoodCoveredTiles(city, network);
   const granaryFood = getGranaryStoredFood(city);
   const marketFood = getMarketStoredFood(city);
-  const granaryCapacity = getGranaryFoodCapacity(city);
-  const marketCapacity = getMarketFoodCapacity(city);
+  const granaryCapacity = getGranaryFoodCapacity(city, network);
+  const marketCapacity = getMarketFoodCapacity(city, network);
 
   return {
     farms: countBuildings(city, 'farm'),
@@ -395,11 +396,11 @@ export function getFoodStats(city: CityState): FoodStats {
     granaryCapacity,
     marketFood,
     marketCapacity,
-    marketDemand: getActiveBuildings(city, 'market')
+    marketDemand: getActiveBuildings(city, 'market', network)
       .reduce((total, market) => total + getMarketFoodDemand(market), 0),
     foodStored: granaryFood + marketFood,
     foodCapacity: granaryCapacity + marketCapacity,
-    suppliedMarkets: getActiveBuildings(city, 'market')
+    suppliedMarkets: getActiveBuildings(city, 'market', network)
       .filter((market) => getStoredFood(market) > 0).length,
     housesWithFood: housingStats.housesWithFood,
     foodCoveredTiles: foodCoverage.size,
@@ -410,12 +411,12 @@ export function getTileKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-function produceFood(city: CityState): void {
-  const granaries = getActiveBuildings(city, 'granary')
+function produceFood(city: CityState, network: RoadNetwork): void {
+  const granaries = getActiveBuildings(city, 'granary', network)
     .sort(compareBuildingsByPosition);
   if (granaries.length === 0) return;
 
-  const farms = getActiveBuildings(city, 'farm')
+  const farms = getActiveBuildings(city, 'farm', network)
     .sort(compareBuildingsByPosition);
   for (let farmIndex = 0; farmIndex < farms.length; farmIndex++) {
     let remainingFood = FARM_FOOD_PER_TICK;
@@ -430,15 +431,15 @@ function produceFood(city: CityState): void {
   }
 }
 
-function restockMarkets(city: CityState): void {
-  const markets = getActiveBuildings(city, 'market')
+function restockMarkets(city: CityState, network: RoadNetwork): void {
+  const markets = getActiveBuildings(city, 'market', network)
     .sort(compareBuildingsByPosition);
 
   for (const market of markets) {
     let remainingDemand = Math.min(MARKET_RESTOCK_PER_TICK, getMarketFoodDemand(market));
     if (remainingDemand === 0) continue;
 
-    for (const granary of getMarketSupplyCandidates(city, market)) {
+    for (const granary of getMarketSupplyCandidates(city, market, network)) {
       const transferred = Math.min(remainingDemand, getStoredFood(granary));
       if (transferred <= 0) continue;
       granary.storedFood = getStoredFood(granary) - transferred;
@@ -449,23 +450,34 @@ function restockMarkets(city: CityState): void {
   }
 }
 
-function getHouseFoodMarket(city: CityState, house: Building): Building | undefined {
-  return getActiveBuildings(city, 'market')
-    .filter((market) => getStoredFood(market) > 0
-      && getManhattanDistance(market, house) <= MARKET_FOOD_RADIUS)
-    .sort((a, b) => (
-      getManhattanDistance(a, house) - getManhattanDistance(b, house)
-      || compareBuildingsByPosition(a, b)
-    ))[0];
+function getHouseFoodMarket(city: CityState, house: Building, network: RoadNetwork): Building | undefined {
+  return getReachableBuildings(city, house, 'market', MARKET_FOOD_RADIUS, network)
+    .find((market) => market.active === true && getStoredFood(market) > 0);
+}
+
+function getReachableBuildings(
+  city: CityState,
+  source: Building,
+  type: Building['type'],
+  radius: number,
+  network: RoadNetwork,
+): Building[] {
+  const distances = getRoadDistances(network, source, radius);
+  const reachable: { building: Building; distance: number }[] = [];
+  for (const building of city.buildings) {
+    if (building.type !== type) continue;
+    const distance = getDistanceToBuilding(network, distances, building);
+    if (distance !== undefined) reachable.push({ building, distance });
+  }
+  return reachable
+    .sort((a, b) => a.distance - b.distance || compareBuildingsByPosition(a.building, b.building))
+    .map(({ building }) => building);
 }
 
 function getStoredFood(building: Building): number {
   return Math.max(0, building.storedFood ?? 0);
 }
 
-function getManhattanDistance(a: Building, b: Building): number {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-}
 
 function getHouseLevel(building: Building): HouseLevel {
   return normalizeHouseLevel(building.level);
@@ -531,41 +543,36 @@ function updateHouseLevel(building: Building, services: HouseServices): void {
   }
 }
 
-function getWaterCoverage(city: CityState): Set<string> {
-  return getRadiusCoverage(city, 'well', WATER_RADIUS);
+function getWaterCoverage(city: CityState, network: RoadNetwork): Set<string> {
+  return getRoadCoverage(
+    city, city.buildings.filter((building) => building.type === 'well'), WATER_RADIUS, network,
+  );
 }
 
-function getRadiusCoverage(
+function getRoadCoverage(
   city: CityState,
-  sourceType: Building['type'],
+  sources: readonly Building[],
   radius: number,
-  activeOnly = false,
+  network: RoadNetwork,
 ): Set<string> {
   const coverage = new Set<string>();
-
-  for (const building of city.buildings) {
-    if (building.type !== sourceType) continue;
-    if (activeOnly && building.active !== true) continue;
-
-    addRadiusCoverage(city, coverage, building, radius);
+  for (const source of sources) {
+    const distances = getRoadDistances(network, source, radius);
+    for (const key of distances.keys()) coverage.add(key);
+    for (const building of city.buildings) {
+      if (building.type === 'road') continue;
+      if (getDistanceToBuilding(network, distances, building) !== undefined) {
+        coverage.add(getTileKey(building.x, building.y));
+      }
+    }
   }
-
   return coverage;
 }
 
-function addRadiusCoverage(city: CityState, coverage: Set<string>, building: Building, radius: number): void {
-  for (let dy = -radius; dy <= radius; dy++) {
-    const remainingRadius = radius - Math.abs(dy);
-    for (let dx = -remainingRadius; dx <= remainingRadius; dx++) {
-      const x = building.x + dx;
-      const y = building.y + dy;
-      if (getTile(city, x, y)) coverage.add(getTileKey(x, y));
-    }
-  }
-}
-
-function getActiveBuildings(city: CityState, type: Building['type']): Building[] {
-  return city.buildings.filter((building) => building.type === type && building.active === true);
+function getActiveBuildings(city: CityState, type: Building['type'], network: RoadNetwork): Building[] {
+  return city.buildings.filter((building) => (
+    building.type === type && building.active === true && isBuildingOnRoadNetwork(city, building, network)
+  ));
 }
 
 function compareBuildingsByPosition(a: Building, b: Building): number {
@@ -576,9 +583,10 @@ function countBuildings(city: CityState, type: Building['type']): number {
   return city.buildings.reduce((total, building) => total + (building.type === type ? 1 : 0), 0);
 }
 
-function countActiveBuildings(city: CityState, type: Building['type']): number {
+function countActiveBuildings(city: CityState, type: Building['type'], network: RoadNetwork): number {
   return city.buildings.reduce((total, building) => (
-    total + (building.type === type && building.active === true ? 1 : 0)
+    total + (building.type === type && building.active === true
+      && isBuildingOnRoadNetwork(city, building, network) ? 1 : 0)
   ), 0);
 }
 

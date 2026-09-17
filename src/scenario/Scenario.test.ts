@@ -84,10 +84,12 @@ describe('Founding Settlement scenario evaluation', () => {
   it('wins only when every objective passes in the same evaluation', () => {
     const city = createEmptyCity();
     city.resources.money = 100;
-    addBuilding(city, 'well', 5, 5);
+    addBuilding(city, 'well', 4, 5);
+    addBuilding(city, 'market', 5, 5, { storedFood: 40 });
+    for (let x = 1; x <= 10; x++) addBuilding(city, 'road', x, 4);
     const houseTiles = [
-      [5, 2], [4, 3], [5, 3], [6, 3], [3, 5],
-      [4, 5], [6, 5], [7, 5], [5, 6], [5, 7],
+      [1, 3], [2, 3], [3, 3], [4, 3], [5, 3],
+      [6, 3], [7, 3], [8, 3], [9, 3], [10, 3],
     ] as const;
     houseTiles.forEach(([x, y], index) => addHouse(city, x, y, { level: 3, population: 14, hasFood: index < 5 }));
     assignWorkers(city);
@@ -128,7 +130,7 @@ describe('Founding Settlement scenario evaluation', () => {
   it('advances the population objective when residents arrive, not when empty capacity is added', () => {
     const city = createEmptyCity();
     const houseTiles = [
-      [4, 4], [5, 4], [6, 4], [4, 5], [6, 5], [4, 6], [5, 6],
+      [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3],
     ] as const;
     houseTiles.forEach(([x, y]) => addHouse(city, x, y, { level: 3, population: 0 }));
 
@@ -141,10 +143,9 @@ describe('Founding Settlement scenario evaluation', () => {
     expect(getObjective(evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO), 'population'))
       .toMatchObject({ current: 79, completed: false });
 
-    addBuilding(city, 'well', 5, 5);
-    addBuilding(city, 'market', 6, 6, { storedFood: 40 });
-    const roadTiles = [[4, 3], [5, 3], [6, 3], [3, 5], [7, 5], [3, 6], [5, 7]] as const;
-    roadTiles.forEach(([x, y]) => addBuilding(city, 'road', x, y));
+    addBuilding(city, 'well', 4, 5);
+    addBuilding(city, 'market', 5, 5, { storedFood: 40 });
+    for (let x = 1; x <= 7; x++) addBuilding(city, 'road', x, 4);
     for (let tick = 0; tick < 3; tick++) simulateTick(city);
 
     expect(getPopulationStats(city)).toMatchObject({ population: 81, capacity: 98, lastChange: 2 });
@@ -154,10 +155,12 @@ describe('Founding Settlement scenario evaluation', () => {
 
   it('calculates water and food coverage percentages from total houses', () => {
     const city = createEmptyCity();
-    addBuilding(city, 'well', 5, 5);
+    addBuilding(city, 'well', 4, 5);
+    addBuilding(city, 'market', 5, 5, { active: true, storedFood: 40 });
+    for (let x = 1; x <= 7; x++) addBuilding(city, 'road', x, 4);
     const houseTiles = [
-      [5, 2], [4, 3], [5, 3], [6, 3], [3, 5],
-      [4, 5], [6, 5], [0, 0], [10, 10], [11, 10],
+      [1, 3], [2, 3], [3, 3], [4, 3], [5, 3],
+      [6, 3], [7, 3], [0, 0], [10, 10], [11, 10],
     ] as const;
     houseTiles.forEach(([x, y], index) => addHouse(city, x, y, { hasFood: index < 5 }));
 

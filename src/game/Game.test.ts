@@ -37,6 +37,7 @@ const doubles = vi.hoisted(() => ({
     onReset: () => void;
     onWaterOverlayToggle: () => boolean;
     onFoodOverlayToggle: () => boolean;
+    onRoadNetworkOverlayToggle: () => boolean;
   }>,
   cameraControlsInstances: [] as Array<{
     onZoomIn: () => void;
@@ -120,6 +121,7 @@ vi.mock('../ui/BuildPanel', () => ({
       onReset: () => void,
       onWaterOverlayToggle: () => boolean,
       onFoodOverlayToggle: () => boolean,
+      onRoadNetworkOverlayToggle: () => boolean,
     ) {
       doubles.buildPanelInstances.push({
         selectedTool: this.selectedTool,
@@ -127,6 +129,7 @@ vi.mock('../ui/BuildPanel', () => ({
         onReset,
         onWaterOverlayToggle,
         onFoodOverlayToggle,
+        onRoadNetworkOverlayToggle,
       });
     }
   },
@@ -272,17 +275,35 @@ describe('startGame camera and cleanup', () => {
     cleanup();
   });
 
-  it('refreshes overlays without resetting the camera', async () => {
-    const host = { clientWidth: 800, clientHeight: 600 } as HTMLElement;
-    const panelHost = {} as HTMLElement;
-
-    await startGame(host, panelHost);
+  it('keeps road overlays enabled across other toggles, ticks and reset without recentering until reset', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
     const map = getMapRendererDouble();
+    const panel = doubles.buildPanelInstances[0];
+    const tick = doubles.setInterval.mock.calls[0]?.[0];
+    if (panel === undefined || tick === undefined) throw new Error('Expected game controls and timer.');
 
-    expect(doubles.buildPanelInstances[0]?.onWaterOverlayToggle()).toBe(true);
-
-    expect(map.refresh).toHaveBeenCalled();
+    expect(panel.onRoadNetworkOverlayToggle()).toBe(true);
+    expect(panel.onWaterOverlayToggle()).toBe(true);
+    expect(panel.onFoodOverlayToggle()).toBe(true);
+    tick();
+    expect(map.refresh).toHaveBeenLastCalledWith(expect.anything(), {
+      waterOverlay: true, foodOverlay: true, roadNetworkOverlay: true,
+    });
     expect(map.fitCamera).toHaveBeenCalledOnce();
+
+    panel.onReset();
+    expect(map.refresh).toHaveBeenLastCalledWith(expect.anything(), {
+      waterOverlay: true, foodOverlay: true, roadNetworkOverlay: true,
+    });
+    expect(map.fitCamera).toHaveBeenCalledTimes(2);
+    expect(panel.onRoadNetworkOverlayToggle()).toBe(false);
+    expect(map.refresh).toHaveBeenLastCalledWith(expect.anything(), {
+      waterOverlay: true, foodOverlay: true, roadNetworkOverlay: false,
+    });
+    cleanup();
   });
 
   it('zooms with the wheel and camera controls', async () => {

@@ -5,9 +5,9 @@ import {
   getHouseServices,
   getHousingStats,
   getWorkforceStats,
-  hasAdjacentRoad,
 } from '../simulation/Simulation';
 import { getHouseStatus } from '../simulation/HouseSpecification';
+import { getRoadNetwork, isBuildingOnRoadNetwork, type RoadNetwork } from '../simulation/RoadNetwork';
 
 export type CityIssueType =
   | 'water_shortage'
@@ -60,17 +60,17 @@ const ISSUE_TYPE_ORDER: Readonly<Record<CityIssueType, number>> = {
   low_money: 6,
 };
 
-export function summarizeCity(city: CityState): CityStateSummary {
-  const housingStats = getHousingStats(city);
-  const foodStats = getFoodStats(city);
-  const workforceStats = getWorkforceStats(city);
+export function summarizeCity(city: CityState, network = getRoadNetwork(city)): CityStateSummary {
+  const housingStats = getHousingStats(city, network);
+  const foodStats = getFoodStats(city, network);
+  const workforceStats = getWorkforceStats(city, network);
 
   return {
     tick: city.simulation.tick,
     money: city.resources.money,
     houses: housingStats.totalHouses,
-    housesWithoutWater: getHousesWithoutWater(city).length,
-    housesWithoutFood: getHousesWithoutFood(city).length,
+    housesWithoutWater: getHousesWithoutWater(city, network).length,
+    housesWithoutFood: getHousesWithoutFood(city, network).length,
     foodStored: foodStats.foodStored,
     foodCapacity: foodStats.foodCapacity,
     farms: foodStats.farms,
@@ -83,23 +83,24 @@ export function summarizeCity(city: CityState): CityStateSummary {
 }
 
 export function analyzeCity(city: CityState): CityIssue[] {
-  const summary = summarizeCity(city);
-  const foodStats = getFoodStats(city);
-  const workforceStats = getWorkforceStats(city);
+  const network = getRoadNetwork(city);
+  const summary = summarizeCity(city, network);
+  const foodStats = getFoodStats(city, network);
+  const workforceStats = getWorkforceStats(city, network);
   const issues: CityIssue[] = [];
 
-  const housesWithoutWater = getHousesWithoutWater(city);
+  const housesWithoutWater = getHousesWithoutWater(city, network);
   if (housesWithoutWater.length > 0) {
     issues.push({
       type: 'water_shortage',
       severity: shortageSeverity(housesWithoutWater.length, summary.houses),
       affectedTiles: toTiles(housesWithoutWater),
       explanation: `Falta água em ${housesWithoutWater.length} casa${housesWithoutWater.length === 1 ? '' : 's'}.`,
-      cause: 'Casas com estrada ficam fora do raio de poços existentes.',
+      cause: 'Nenhum poço ligado está dentro do alcance pela rede de estradas destas casas.',
     });
   }
 
-  const housesWithoutFood = getHousesWithoutFood(city);
+  const housesWithoutFood = getHousesWithoutFood(city, network);
   const foodExpected = foodStats.markets > 0
     || foodStats.granaries > 0
     || foodStats.farms > 0
@@ -111,11 +112,12 @@ export function analyzeCity(city: CityState): CityIssue[] {
       severity: shortageSeverity(housesWithoutFood.length, summary.houses),
       affectedTiles: toTiles(housesWithoutFood),
       explanation: `Falta comida em ${housesWithoutFood.length} casa${housesWithoutFood.length === 1 ? '' : 's'}.`,
-      cause: 'Casas com estrada e água ainda não recebem comida.',
+      cause: 'Casas com estrada e água não recebem comida de um market ativo com stock dentro do alcance pela rede de estradas.',
     });
   }
 
-  const activeFarms = countBuildings(city, 'farm', true);
+  const activeFarms = getSortedBuildings(city, 'farm')
+    .filter((building) => building.active === true && isBuildingOnRoadNetwork(city, building, network)).length;
   const needsFood = summary.houses > 0 && housesWithoutFood.length > 0 && foodExpected;
   if (needsFood && (activeFarms === 0 || foodStats.granaryCapacity === 0 || foodStats.granaryFood === 0)) {
     const cause = foodStats.granaryCapacity === 0
@@ -130,14 +132,16 @@ export function analyzeCity(city: CityState): CityIssue[] {
     });
   }
 
-  const foodCoveredTiles = getFoodCoveredTiles(city).size;
-  if (needsFood && foodStats.granaryFood > 0 && (foodStats.marketFood === 0 || foodCoveredTiles === 0)) {
+  const foodCoveredTiles = getFoodCoveredTiles(city, network);
+  const housesOutsideFoodReach = housesWithoutFood
+    .filter((building) => !foodCoveredTiles.has(`${building.x},${building.y}`));
+  if (needsFood && foodStats.granaryFood > 0 && housesOutsideFoodReach.length > 0) {
     issues.push({
       type: 'food_distribution_shortage',
-      severity: shortageSeverity(housesWithoutFood.length, summary.houses),
-      affectedTiles: toTiles(housesWithoutFood),
+      severity: shortageSeverity(housesOutsideFoodReach.length, summary.houses),
+      affectedTiles: toTiles(housesOutsideFoodReach),
       explanation: 'Comida armazenada não chega às casas.',
-      cause: 'Granary tem comida, mas nenhum market ativo com stock e alcance serve estas casas.',
+      cause: 'Granary tem comida, mas nenhum market ativo com stock dentro do alcance pela rede de estradas serve estas casas.',
     });
   }
 
@@ -145,21 +149,21 @@ export function analyzeCity(city: CityState): CityIssue[] {
     issues.push({
       type: 'worker_shortage',
       severity: workerShortageSeverity(summary.workerShortage, summary.workersRequired),
-      affectedTiles: toTiles(getInactiveWorkplaces(city)),
+      affectedTiles: toTiles(getInactiveWorkplaces(city, network)),
       explanation: `Faltam ${summary.workerShortage} trabalhadores.`,
       cause: `${workforceStats.workersRequired} trabalhadores necessários para ${workforceStats.workersAvailable} disponíveis.`,
     });
   }
 
   const buildingsWithoutRoad = getSortedBuildings(city)
-    .filter((building) => isEconomicBuilding(building) && !hasAdjacentRoad(city, building));
+    .filter((building) => building.type !== 'road' && !isBuildingOnRoadNetwork(city, building, network));
   if (buildingsWithoutRoad.length > 0) {
     issues.push({
       type: 'road_access_missing',
       severity: buildingsWithoutRoad.length >= 3 ? 'medium' : 'low',
       affectedTiles: toTiles(buildingsWithoutRoad),
-      explanation: `${buildingsWithoutRoad.length} edifício${buildingsWithoutRoad.length === 1 ? '' : 's'} económico${buildingsWithoutRoad.length === 1 ? '' : 's'} sem estrada.`,
-      cause: 'Farms, granaries e markets precisam de estrada adjacente para orientação futura.',
+      explanation: `${buildingsWithoutRoad.length} edifício${buildingsWithoutRoad.length === 1 ? '' : 's'} sem ligação à rede principal de estradas.`,
+      cause: getRoadAccessCause(buildingsWithoutRoad, network),
     });
   }
 
@@ -176,25 +180,26 @@ export function analyzeCity(city: CityState): CityIssue[] {
   return issues.sort(compareIssues);
 }
 
-function getHousesWithoutWater(city: CityState): Building[] {
+function getHousesWithoutWater(city: CityState, network: RoadNetwork): Building[] {
   return getSortedBuildings(city, 'house')
     .filter((building) => {
-      const status = getHouseStatus(building.level, getHouseServices(city, building));
+      const status = getHouseStatus(building.level, getHouseServices(city, building, network));
       return status.missingForCurrentLevel === 'water' || status.missingForNextLevel === 'water';
     });
 }
 
-function getHousesWithoutFood(city: CityState): Building[] {
+function getHousesWithoutFood(city: CityState, network: RoadNetwork): Building[] {
   return getSortedBuildings(city, 'house')
     .filter((building) => {
-      const status = getHouseStatus(building.level, getHouseServices(city, building));
+      const status = getHouseStatus(building.level, getHouseServices(city, building, network));
       return status.missingForCurrentLevel === 'food' || status.missingForNextLevel === 'food';
     });
 }
 
-function getInactiveWorkplaces(city: CityState): Building[] {
+function getInactiveWorkplaces(city: CityState, network: RoadNetwork): Building[] {
   return getSortedBuildings(city)
-    .filter((building) => isEconomicBuilding(building) && building.active !== true);
+    .filter((building) => isEconomicBuilding(building)
+      && (building.active !== true || !isBuildingOnRoadNetwork(city, building, network)));
 }
 
 function getSortedBuildings(city: CityState, type?: Building['type']): Building[] {
@@ -203,10 +208,28 @@ function getSortedBuildings(city: CityState, type?: Building['type']): Building[
     .sort((a, b) => a.y - b.y || a.x - b.x || a.id.localeCompare(b.id));
 }
 
-function countBuildings(city: CityState, type: Building['type'], activeOnly = false): number {
-  return city.buildings.reduce((total, building) => (
-    total + (building.type === type && (!activeOnly || building.active === true) ? 1 : 0)
-  ), 0);
+function getRoadAccessCause(buildings: readonly Building[], network: RoadNetwork): string {
+  let withoutAdjacentRoad = 0;
+  let besideIsolatedRoad = 0;
+  for (const building of buildings) {
+    if (network.roadTiles.has(`${building.x},${building.y - 1}`)
+      || network.roadTiles.has(`${building.x + 1},${building.y}`)
+      || network.roadTiles.has(`${building.x},${building.y + 1}`)
+      || network.roadTiles.has(`${building.x - 1},${building.y}`)) {
+      besideIsolatedRoad += 1;
+    } else {
+      withoutAdjacentRoad += 1;
+    }
+  }
+
+  const causes: string[] = [];
+  if (withoutAdjacentRoad > 0) {
+    causes.push(`${withoutAdjacentRoad} edifício${withoutAdjacentRoad === 1 ? '' : 's'} sem estrada adjacente.`);
+  }
+  if (besideIsolatedRoad > 0) {
+    causes.push(`${besideIsolatedRoad} edifício${besideIsolatedRoad === 1 ? '' : 's'} junto a estrada isolada, sem ligação à rede principal.`);
+  }
+  return causes.join(' ');
 }
 
 function shortageSeverity(shortage: number, total: number): CityIssueSeverity {

@@ -25,6 +25,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   assignWorkers(city);
   let waterOverlay = false;
   let foodOverlay = false;
+  let roadNetworkOverlay = false;
   let paused = false;
   let speed: SimulationSpeed = 1;
   let tickHandle: number | undefined;
@@ -46,15 +47,21 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     },
     () => {
       waterOverlay = !waterOverlay;
-      map.refresh(city, { waterOverlay, foodOverlay });
+      map.refresh(city, { waterOverlay, foodOverlay, roadNetworkOverlay });
       app.render();
       return waterOverlay;
     },
     () => {
       foodOverlay = !foodOverlay;
-      map.refresh(city, { waterOverlay, foodOverlay });
+      map.refresh(city, { waterOverlay, foodOverlay, roadNetworkOverlay });
       app.render();
       return foodOverlay;
+    },
+    () => {
+      roadNetworkOverlay = !roadNetworkOverlay;
+      map.refresh(city, { waterOverlay, foodOverlay, roadNetworkOverlay });
+      app.render();
+      return roadNetworkOverlay;
     },
   );
   const cameraControls = new CameraControls(
@@ -126,7 +133,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       return;
     }
 
-    panel.update(city, messages[result], waterOverlay, foodOverlay, { buildBlocked: isScenarioTerminal() });
+    panel.update(city, messages[result], waterOverlay, foodOverlay, roadNetworkOverlay, { buildBlocked: isScenarioTerminal() });
   });
   app.stage.on('pointermove', (event: FederatedPointerEvent) => {
     if (!isPanning || lastPanPoint === undefined) return;
@@ -149,7 +156,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   };
 
   function refreshCity(message: string): void {
-    map.refresh(city, { waterOverlay, foodOverlay });
+    map.refresh(city, { waterOverlay, foodOverlay, roadNetworkOverlay });
     const scenarioProgress = evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO);
     if (scenarioProgress.status !== 'active') {
       paused = true;
@@ -163,6 +170,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
       scenarioProgress.resultMessage ?? message,
       waterOverlay,
       foodOverlay,
+      roadNetworkOverlay,
       { buildBlocked: scenarioProgress.status !== 'active' },
     );
     app.render();

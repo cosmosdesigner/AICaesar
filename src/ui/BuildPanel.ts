@@ -1,5 +1,6 @@
 import { analyzeCity } from '../analysis/CityAnalyzer';
 import { BUILD_COSTS, type CityState } from '../simulation/CityState';
+import { getRoadNetworkStats } from '../simulation/RoadNetwork';
 import { getFinanceStats, getFoodStats, getHousingStats, getPopulationStats, getWorkforceStats } from '../simulation/Simulation';
 import type { BuildingType } from '../simulation/Tile';
 
@@ -13,12 +14,12 @@ export const BUILD_LABELS: Readonly<Record<BuildingType, string>> = {
 };
 
 const BUILD_TITLES: Readonly<Record<BuildingType, string>> = {
-  road: 'Roads connect services and buildings.',
-  house: 'Houses begin empty and attract residents when they have road, water and food.',
-  well: 'Wells provide water coverage to nearby houses.',
-  farm: 'Farms produce food when enough workers are available.',
-  granary: 'Granaries add food storage capacity when active.',
-  market: 'Markets distribute stored food to nearby houses when active.',
+  road: 'Roads connect buildings to the main road network. Isolated roads do not activate buildings.',
+  house: 'Houses begin empty and attract residents with main road access, water and food reached along roads.',
+  well: 'Wells connected to the main network provide water within 3 road steps. Isolated wells do not work.',
+  farm: 'Farms produce food only with main road access and enough workers.',
+  granary: 'Granaries store food only with main road access and enough workers; they supply markets within 8 road steps.',
+  market: 'Markets need main road access and workers; stocked markets serve houses within 4 road steps.',
 };
 
 const BUILD_TOOLS: readonly BuildingType[] = ['road', 'house', 'well', 'farm', 'granary', 'market'];
@@ -43,6 +44,9 @@ export class BuildPanel {
   private readonly financeNext = document.createElement('strong');
   private readonly housesTotal = document.createElement('strong');
   private readonly housesRoad = document.createElement('strong');
+  private readonly mainRoadTiles = document.createElement('strong');
+  private readonly connectedBuildings = document.createElement('strong');
+  private readonly isolatedBuildings = document.createElement('strong');
   private readonly housesWater = document.createElement('strong');
   private readonly housesFood = document.createElement('strong');
   private readonly housesLevelTwo = document.createElement('strong');
@@ -76,6 +80,7 @@ export class BuildPanel {
   private readonly issuesList = document.createElement('ol');
   private readonly waterOverlay = document.createElement('button');
   private readonly foodOverlay = document.createElement('button');
+  private readonly roadNetworkOverlay = document.createElement('button');
   private readonly status = document.createElement('p');
 
   constructor(
@@ -83,6 +88,7 @@ export class BuildPanel {
     onReset: () => void,
     onWaterOverlayToggle: () => boolean,
     onFoodOverlayToggle: () => boolean,
+    onRoadNetworkOverlayToggle: () => boolean,
   ) {
     this.element.className = 'build-panel';
     this.element.setAttribute('aria-label', 'Construção manual');
@@ -118,8 +124,11 @@ export class BuildPanel {
     const stats = document.createElement('div');
     stats.className = 'build-stats';
     stats.append(
+      this.createStat('Road network', this.mainRoadTiles),
+      this.createStat('Connected buildings', this.connectedBuildings),
+      this.createStat('Isolated buildings', this.isolatedBuildings),
       this.createStat('Casas', this.housesTotal),
-      this.createStat('Com estrada', this.housesRoad),
+      this.createStat('Com rede principal', this.housesRoad),
       this.createStat('Com água', this.housesWater),
       this.createStat('Com comida', this.housesFood),
       this.createStat('Nível 2', this.housesLevelTwo),
@@ -176,26 +185,38 @@ export class BuildPanel {
 
     this.waterOverlay.type = 'button';
     this.waterOverlay.textContent = 'Show water coverage: Off';
-    this.waterOverlay.title = 'Toggle tiles covered by wells.';
+    this.waterOverlay.title = 'Show roads reached within 3 road steps of connected wells and existing buildings adjacent to those roads.';
     this.waterOverlay.setAttribute('aria-pressed', 'false');
     this.waterOverlay.addEventListener('click', () => {
       const enabled = onWaterOverlayToggle();
       this.setWaterOverlay(enabled);
       this.status.textContent = enabled
-        ? 'Water coverage overlay shows tiles served by wells.'
+        ? 'Water coverage shows reached main roads and existing buildings beside them; proximity alone is not enough.'
         : 'Water coverage overlay hidden.';
     });
 
     this.foodOverlay.type = 'button';
     this.foodOverlay.textContent = 'Show food coverage: Off';
-    this.foodOverlay.title = 'Toggle tiles covered by active markets.';
+    this.foodOverlay.title = 'Show roads reached within 4 road steps of active stocked markets and existing buildings adjacent to those roads.';
     this.foodOverlay.setAttribute('aria-pressed', 'false');
     this.foodOverlay.addEventListener('click', () => {
       const enabled = onFoodOverlayToggle();
       this.setFoodOverlay(enabled);
       this.status.textContent = enabled
-        ? 'Food coverage overlay shows active market reach and hungry houses.'
+        ? 'Food coverage shows road reach from active stocked markets and hungry houses; proximity alone is not enough.'
         : 'Food coverage overlay hidden.';
+    });
+
+    this.roadNetworkOverlay.type = 'button';
+    this.roadNetworkOverlay.textContent = 'Show road network: Off';
+    this.roadNetworkOverlay.title = 'Green roads belong to the main network; orange roads are isolated. Isolated farms, granaries, markets and wells do not work.';
+    this.roadNetworkOverlay.setAttribute('aria-pressed', 'false');
+    this.roadNetworkOverlay.addEventListener('click', () => {
+      const enabled = onRoadNetworkOverlayToggle();
+      this.setRoadNetworkOverlay(enabled);
+      this.status.textContent = enabled
+        ? 'Road network: green = main, orange = isolated. Buildings must touch the main network to function.'
+        : 'Road network overlay hidden.';
     });
 
     this.issues.className = 'city-issues';
@@ -218,6 +239,7 @@ export class BuildPanel {
       finance,
       this.waterOverlay,
       this.foodOverlay,
+      this.roadNetworkOverlay,
       this.issues,
       reset,
       this.status,
@@ -225,12 +247,16 @@ export class BuildPanel {
     host.append(this.element);
   }
 
-  update(city: CityState, message: string, waterOverlay: boolean, foodOverlay: boolean, options: BuildPanelUpdateOptions = {}): void {
+  update(city: CityState, message: string, waterOverlay: boolean, foodOverlay: boolean, roadNetworkOverlay: boolean, options: BuildPanelUpdateOptions = {}): void {
     const housingStats = getHousingStats(city);
     const foodStats = getFoodStats(city);
     const workforceStats = getWorkforceStats(city);
     const populationStats = getPopulationStats(city);
     const financeStats = getFinanceStats(city);
+    const networkStats = getRoadNetworkStats(city);
+    this.mainRoadTiles.textContent = `${networkStats.mainRoadTiles} tiles`;
+    this.connectedBuildings.textContent = `${networkStats.connectedBuildings}/${networkStats.totalBuildings}`;
+    this.isolatedBuildings.textContent = String(networkStats.isolatedBuildings);
     this.money.textContent = String(city.resources.money);
     this.tick.textContent = String(city.simulation.tick);
     this.housesTotal.textContent = String(housingStats.totalHouses);
@@ -273,6 +299,7 @@ export class BuildPanel {
     for (const button of this.toolButtons) button.disabled = buildBlocked;
     this.setWaterOverlay(waterOverlay);
     this.setFoodOverlay(foodOverlay);
+    this.setRoadNetworkOverlay(roadNetworkOverlay);
     const issues = analyzeCity(city).slice(0, 3);
     this.issuesList.replaceChildren();
     if (issues.length === 0) {
@@ -308,6 +335,11 @@ export class BuildPanel {
   private setFoodOverlay(enabled: boolean): void {
     this.foodOverlay.textContent = `Show food coverage: ${enabled ? 'On' : 'Off'}`;
     this.foodOverlay.setAttribute('aria-pressed', String(enabled));
+  }
+
+  private setRoadNetworkOverlay(enabled: boolean): void {
+    this.roadNetworkOverlay.textContent = `Show road network: ${enabled ? 'On' : 'Off'}`;
+    this.roadNetworkOverlay.setAttribute('aria-pressed', String(enabled));
   }
 }
 

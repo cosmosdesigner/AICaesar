@@ -21,7 +21,7 @@ function createEmptyCity(width = 20, height = 20): CityState {
     for (let x = 0; x < width; x++) tiles.push({ x, y, terrain: 'grass' });
   }
 
-  return {
+  const city: CityState = {
     width,
     height,
     tiles,
@@ -29,6 +29,11 @@ function createEmptyCity(width = 20, height = 20): CityState {
     resources: { money: 500 },
     simulation: { tick: 0, finance: { period: 0, lastRevenue: 0, lastUpkeep: 0, lastNet: 0 }, population: { lastChange: 0 } },
   };
+  for (let x = 0; x <= 18; x++) addBuilding(city, 'road', x, 0);
+  for (let y = 1; y <= 3; y++) addBuilding(city, 'road', 0, y);
+  for (let x = 1; x <= 5; x++) addBuilding(city, 'road', x, 3);
+  for (let y = 4; y <= 7; y++) addBuilding(city, 'road', 5, y);
+  return city;
 }
 
 function addBuilding(city: CityState, type: BuildingType, x: number, y: number, patch: Partial<Building> = {}): Building {
@@ -84,6 +89,7 @@ describe('Phase 17 food logistics', () => {
 
     const fullCity = createEmptyCity();
     addWorkerHouse(fullCity, 15, 15);
+    addWorkerHouse(fullCity, 16, 15);
     addBuilding(fullCity, 'farm', 1, 1);
     const fullGranary = addBuilding(fullCity, 'granary', 2, 1, { storedFood: GRANARY_FOOD_CAPACITY });
 

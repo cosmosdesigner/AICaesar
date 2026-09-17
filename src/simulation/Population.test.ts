@@ -49,6 +49,12 @@ function addBuilding(city: CityState, type: BuildingType, x: number, y: number, 
   return building;
 }
 
+function addRoadIfEmpty(city: CityState, x: number, y: number): void {
+  const tile = city.tiles[y * city.width + x];
+  if (tile && tile.buildingId === undefined) addBuilding(city, 'road', x, y);
+}
+
+
 function addHouse(city: CityState, x: number, y: number, patch: Partial<Building> = {}): Building {
   return addBuilding(city, 'house', x, y, {
     level: 1,
@@ -63,7 +69,15 @@ function addHouse(city: CityState, x: number, y: number, patch: Partial<Building
 }
 
 function addRoadWaterFoodServices(city: CityState, house: Building, missing?: 'road' | 'water' | 'food'): void {
-  if (missing !== 'road') addBuilding(city, 'road', house.x - 1, house.y);
+  if (missing !== 'road') {
+    for (const [x, y] of [
+      [house.x - 1, house.y],
+      [house.x - 1, house.y + 1],
+      [house.x, house.y + 1],
+      [house.x + 1, house.y + 1],
+      [house.x + 2, house.y + 1],
+    ] as const) addRoadIfEmpty(city, x, y);
+  }
   if (missing !== 'water') addBuilding(city, 'well', house.x, house.y + 2);
   if (missing !== 'food') addBuilding(city, 'market', house.x + 2, house.y, { storedFood: 40 });
 }
@@ -71,9 +85,10 @@ function addRoadWaterFoodServices(city: CityState, house: Building, missing?: 'r
 function addWorkerPopulationForMarket(city: CityState): void {
   addHouse(city, 6, 2, { level: 3, population: HOUSE_SPECIFICATIONS[3].populationCapacity });
   addHouse(city, 6, 1, { level: 3, population: HOUSE_SPECIFICATIONS[3].populationCapacity });
-  addBuilding(city, 'road', 6, 0);
+  for (const [x, y] of [[5, 3], [5, 2], [5, 1], [6, 3], [7, 3]] as const) {
+    addRoadIfEmpty(city, x, y);
+  }
   addBuilding(city, 'granary', 7, 2, { storedFood: 100 });
-  addBuilding(city, 'road', 6, 3);
   addBuilding(city, 'well', 6, 4);
 }
 
@@ -212,8 +227,8 @@ describe('population state', () => {
     simulateTick(city);
 
     expect(house.hasRoadAccess).toBe(missing !== 'road');
-    expect(house.hasWater).toBe(missing !== 'water');
-    expect(house.hasFood).toBe(missing !== 'food');
+    expect(house.hasWater).toBe(missing !== 'road' && missing !== 'water');
+    expect(house.hasFood).toBe(missing !== 'road' && missing !== 'food');
     expect(house.population).toBe(1);
   });
 
@@ -272,6 +287,10 @@ describe('population state', () => {
     addBuilding(city, 'well', 6, 4);
     const farm = addBuilding(city, 'farm', 10, 10);
     const secondFarm = addBuilding(city, 'farm', 11, 10);
+    for (const [x, y] of [
+      [5, 3], [6, 3], [7, 3], [8, 3], [9, 3], [10, 3],
+      [10, 4], [10, 5], [10, 6], [10, 7], [10, 8], [10, 9], [11, 9],
+    ] as const) addRoadIfEmpty(city, x, y);
     city.simulation.tick = 2;
 
     simulateTick(city);
