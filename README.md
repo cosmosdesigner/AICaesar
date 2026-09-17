@@ -1,6 +1,6 @@
 # AICaesar
 
-**Fase 28 — feedback de preview do tile**: mapa isométrico 30×30, construção e demolição manual de roads/houses/wells/farms/granaries/markets e amenities garden/plaza/fountain, navegação desktop e touch com pan/pinch, preview efémero do tile livre/ocupado, rede principal e serviços por distância BFS em estradas, desirability local determinística, população, workers, finanças, eventos temporários determinísticos, pedidos do imperador, três cenários determinísticos com perfis Easy/Normal, advisor mock local estratégico com planos multi-ação, after-action promise-vs-result, métricas locais de sessão, overlays de água/comida/rede viária/desirability e save/load local v1.
+**Fase 31 — construção com previsão**: mapa isométrico 30×30, construção e demolição manual de roads/houses/wells/farms/granaries/markets e amenities garden/plaza/fountain, navegação desktop e touch com pan/pinch, preview efémero do tile livre/ocupado com custo, tesouro após compra, benefício imediato e risco persistente derivados sem mutar a cidade, rede principal e serviços por distância BFS em estradas, desirability local determinística, população, workers, finanças, eventos temporários determinísticos, pedidos do imperador, três cenários determinísticos com perfis Easy/Normal, advisor mock local estratégico com planos multi-ação, after-action promise-vs-result, métricas locais de sessão, overlays de água/comida/rede viária/desirability e save/load local v1.
 
 ## Executar localmente
 

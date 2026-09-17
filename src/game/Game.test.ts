@@ -836,7 +836,7 @@ describe('startGame camera and cleanup', () => {
 
     doubles.stageHandlers.get('pointermove')?.({ button: 0, global: point, preventDefault: vi.fn() });
     expect(map.setPreview).toHaveBeenLastCalledWith({ x: 20, y: 10, state: 'free' });
-    expect(panel.setPreviewStatus).toHaveBeenLastCalledWith('Tile (20, 10): livre — construir.');
+    expect(panel.setPreviewStatus).toHaveBeenLastCalledWith(expect.stringContaining('Tile (20, 10): livre — construir. Custo: 4. Tesouro depois: 496.'));
     expect(JSON.stringify(city)).toBe(before);
 
     expect(placeBuilding(city, 20, 10, 'well')).toBe('built');

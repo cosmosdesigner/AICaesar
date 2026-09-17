@@ -73,6 +73,11 @@ A informação existe em vários painéis, mas está dispersa. O jogo ainda exig
 
 Fases sugeridas: 31–32
 
+Recorte de execução:
+
+- [Fase 31 — Construir com previsão](phase-31-development-plan.md): mostrar benefício e risco antes da construção, sem mudar a simulação.
+- [Fase 32 — Um cenário que exige planeamento](phase-32-development-plan.md): provar o trade-off de layout num único cenário determinístico.
+
 ### Resultado para o jogador
 
 O jogador sente que o desenho da cidade importa: escolher onde colocar habitação, produção e amenities cria trade-offs visíveis e muda a estratégia, em vez de bastar construir tudo perto da rede.
@@ -117,6 +122,11 @@ A simulação já calcula desirability, alcance viário, trabalhadores e comida,
 ## Release 3 — Pressão, recuperação e progressão
 
 Fases sugeridas: 33–34
+
+Recorte de execução:
+
+- [Fase 33 — Preparar uma crise](phase-33-development-plan.md): uma preparação explícita para um evento existente.
+- [Fase 34 — Recuperação que fecha a sessão](phase-34-development-plan.md): marcos curtos e after-action factual num cenário existente.
 
 ### Resultado para o jogador
 
@@ -261,11 +271,10 @@ Esses itens podem ser tecnicamente interessantes, mas não resolvem o principal 
 
 ## Próximo passo de execução
 
-A próxima fase concreta deve ser a Fase 29, dedicada ao primeiro minuto e ao objectivo actual do cenário:
+A próxima fase concreta deve ser a [Fase 31 — Construir com previsão](phase-31-development-plan.md):
 
-- definir uma rota inicial observável;
-- reduzir a dispersão de informação;
-- acrescentar feedback de “mudança e próximo problema”;
-- validar com testes headless e uma checklist de playtest curta.
+- expor a consequência de uma construção antes da confirmação;
+- reutilizar apenas regras determinísticas já existentes;
+- validar que o preview não muta a simulação.
 
-Só depois de essa rota ser compreensível devemos escolher o conteúdo exacto da Fase 30.
+A Fase 32 só avança depois de o preview permitir uma decisão de localização realmente legível.

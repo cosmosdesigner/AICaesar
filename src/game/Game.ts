@@ -43,6 +43,10 @@ import {
   getTilePreview,
   type TilePreview,
 } from './TilePreview';
+import {
+  describeConstructionImpact,
+  getConstructionImpact,
+} from './ConstructionImpact';
 
 export async function startGame(host: HTMLElement, panelHost: HTMLElement): Promise<() => void> {
   const ZOOM_STEP = 1.1;
@@ -379,7 +383,13 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   function setPreview(nextPreview: TilePreview | null, render = true): void {
     preview = nextPreview;
     map.setPreview(preview);
-    panel.setPreviewStatus(describeTilePreview(preview, panel.selectedTool === 'bulldoze' ? 'demolish' : 'build'));
+    const selectedTool = panel.selectedTool;
+    let impactDescription = '';
+    if (selectedTool !== 'bulldoze' && nextPreview?.state === 'free') {
+      impactDescription = describeConstructionImpact(getConstructionImpact(city, nextPreview, selectedTool));
+    }
+    const tileDescription = describeTilePreview(nextPreview, selectedTool === 'bulldoze' ? 'demolish' : 'build');
+    panel.setPreviewStatus(`${tileDescription}${impactDescription === '' ? '' : ` ${impactDescription}`}`);
     if (render) app.render();
   }
 

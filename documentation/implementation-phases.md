@@ -1089,8 +1089,8 @@ Regra prática:
 
 ## 34. Próximo passo recomendado
 
-As fases 13–28 foram implementadas como base jogável. O roadmap de releases orientado a valor está em [`documentation/next-releases-roadmap.md`](next-releases-roadmap.md).
+As fases 13–30 foram implementadas como base jogável. O roadmap de releases orientado a valor está em [`documentation/next-releases-roadmap.md`](next-releases-roadmap.md).
 
-A próxima fase concreta deve ser a Fase 29: tornar a primeira cidade compreensível, com onboarding curto, objectivo actual destacado e feedback claro sobre mudanças e próximo problema.
+A próxima fase concreta é a [Fase 31 — Construir com previsão](phase-31-development-plan.md): expor, antes da confirmação, o benefício e o risco de uma construção sem criar regras paralelas nem mutar a simulação.
 
-Não recomendo começar já por LLM real, walkers complexos ou mais edifícios. O risco principal é de experiência: adicionar tecnologia sem aumentar a clareza das decisões ou a vontade de continuar a jogar.
+As Fases 32–34 devem seguir a ordem definida no roadmap: cenário de planeamento, preparação de crise e recuperação/after-action. Não avançar para LLM real, walkers complexos ou mais edifícios antes de validar estas decisões com playtest.
