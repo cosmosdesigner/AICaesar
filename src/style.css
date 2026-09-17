@@ -169,7 +169,7 @@ button:focus-visible { outline: 2px solid #f2d690; outline-offset: 3px; }
   border: 1px solid #35463b;
   border-radius: 6px;
 }
-canvas { display: block; }
+canvas { display: block; touch-action: none; }
 #status { position: absolute; inset: 40% 24px auto; text-align: center; }
 footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 24px; line-height: 1.6; }
 footer p:last-child { color: #b9ba8e; }

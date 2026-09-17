@@ -1,15 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import { createCityState, getTile, type CityState } from '../simulation/CityState';
+import { createCityState, getTile, placeBuilding, type CityState } from '../simulation/CityState';
 import type { LoadResult, SaveResult } from '../persistence/CitySave';
 import { getPopulationStats, getWorkforceStats } from '../simulation/Simulation';
 import { startGame } from './Game';
+import type { BuildTool } from '../ui/BuildPanel';
 
 type PointerHandler = (event: {
   readonly button: number;
+  readonly pointerId?: number;
+  readonly pointerType?: string;
   readonly global: { readonly x: number; readonly y: number };
   preventDefault: () => void;
 }) => void;
-
 const doubles = vi.hoisted(() => ({
   appDestroy: vi.fn(),
   buildPanelDestroy: vi.fn(),
@@ -41,7 +43,7 @@ const doubles = vi.hoisted(() => ({
   clearInterval: vi.fn(),
   rendererResize: vi.fn(),
   appRender: vi.fn(),
-  selectedTool: 'road' as 'road' | 'bulldoze',
+  selectedTool: 'road' as BuildTool,
   stageHandlers: new Map<string, PointerHandler>(),
   windowHandlers: new Map<string, (event: KeyboardEvent) => void>(),
   canvasHandlers: new Map<string, (event: WheelEvent) => void>(),
@@ -143,7 +145,7 @@ vi.mock('../ui/BuildPanel', () => ({
     well: 'Well',
   },
   BuildPanel: class BuildPanel {
-    get selectedTool(): 'road' | 'bulldoze' {
+    get selectedTool(): BuildTool {
       return doubles.selectedTool;
     }
     update = vi.fn();
@@ -270,6 +272,20 @@ function getMapRendererDouble() {
   const map = doubles.mapInstances[0];
   if (map === undefined) throw new Error('Expected MapRenderer to be constructed.');
   return map;
+}
+
+function gridPoint(x: number, y: number): { x: number; y: number } {
+  return { x: (x - y) * 60, y: (x + y) * 30 };
+}
+
+function touchEvent(pointerId: number, point: { readonly x: number; readonly y: number }) {
+  return {
+    button: 0,
+    pointerId,
+    pointerType: 'touch',
+    global: point,
+    preventDefault: vi.fn(),
+  };
 }
 
 describe('startGame camera and cleanup', () => {
@@ -686,6 +702,29 @@ describe('startGame camera and cleanup', () => {
     expect(map.applyCamera).toHaveBeenLastCalledWith({ x: 130, y: 100, zoom: 0.5 });
   });
 
+  it('pans with a desktop middle-button drag without applying a tile operation', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    const buildingCount = city.buildings.length;
+    const preventDefault = vi.fn();
+
+    doubles.stageHandlers.get('pointerdown')?.({ button: 1, global: { x: 100, y: 100 }, preventDefault });
+    doubles.stageHandlers.get('pointermove')?.({ button: 1, global: { x: 130, y: 150 }, preventDefault });
+    doubles.stageHandlers.get('pointerup')?.({ button: 1, global: { x: 130, y: 150 }, preventDefault });
+
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(city.buildings).toHaveLength(buildingCount);
+    expect(map.toLocal).not.toHaveBeenCalled();
+    expect(map.applyCamera).toHaveBeenLastCalledWith({ x: 130, y: 100, zoom: 0.5 });
+    cleanup();
+  });
+
   it('keeps ordinary left click construction using map-local coordinates', async () => {
     const host = { clientWidth: 800, clientHeight: 600 } as HTMLElement;
     const panelHost = {} as HTMLElement;
@@ -702,5 +741,288 @@ describe('startGame camera and cleanup', () => {
     expect(map.toLocal).toHaveBeenCalled();
     expect(map.refresh).toHaveBeenCalled();
     expect(map.fitCamera).toHaveBeenCalledOnce();
+  });
+  it('keeps touch taps as single Road construction and Bulldoze demolition', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    const point = gridPoint(22, 10);
+    map.toLocal.mockImplementation((global, _container, out) => {
+      out.x = global.x;
+      out.y = global.y;
+      return out;
+    });
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, point));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(1, point));
+    expect(getTile(city, 22, 10)?.buildingId).toBe('road-22-10');
+    expect(doubles.metricsPanelInstances[0]?.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ buildingsConstructed: 1, buildingsDemolished: 0 }),
+    );
+
+    doubles.selectedTool = 'bulldoze';
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(2, point));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(2, point));
+    expect(getTile(city, 22, 10)?.buildingId).toBeUndefined();
+    expect(doubles.metricsPanelInstances[0]?.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ buildingsConstructed: 1, buildingsDemolished: 1 }),
+    );
+    cleanup();
+  });
+
+  it('constructs each new Road tile once during a touch drag', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    map.toLocal.mockImplementation((global, _container, out) => {
+      out.x = global.x;
+      out.y = global.y;
+      return out;
+    });
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, gridPoint(20, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(22, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(22, 10)));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(1, gridPoint(22, 10)));
+
+    expect(getTile(city, 20, 10)?.buildingId).toBeUndefined();
+    expect(getTile(city, 21, 10)?.buildingId).toBe('road-21-10');
+    expect(getTile(city, 22, 10)?.buildingId).toBe('road-22-10');
+    expect(doubles.metricsPanelInstances[0]?.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ buildingsConstructed: 2 }),
+    );
+    cleanup();
+  });
+
+  it('continues a Road trace after occupied and outside-map tiles while recording only successful builds', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    expect(placeBuilding(city, 20, 10, 'road')).toBe('built');
+    const buildingCountBefore = city.buildings.length;
+    const moneyBefore = city.resources.money;
+    map.toLocal.mockImplementation((global, _container, out) => {
+      out.x = global.x;
+      out.y = global.y;
+      return out;
+    });
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, gridPoint(19, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(20, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(30, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(1, gridPoint(21, 10)));
+
+    expect(getTile(city, 20, 10)?.buildingId).toBe('road-20-10');
+    expect(getTile(city, 21, 10)?.buildingId).toBe('road-21-10');
+    expect(city.buildings).toHaveLength(buildingCountBefore + 1);
+    expect(city.resources.money).toBe(moneyBefore - 4);
+    expect(doubles.metricsPanelInstances[0]?.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ buildingsConstructed: 1 }),
+    );
+    cleanup();
+  });
+
+  it('demolishes each new tile once during a touch Bulldoze drag', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    expect(placeBuilding(city, 20, 10, 'road')).toBe('built');
+    expect(placeBuilding(city, 21, 10, 'road')).toBe('built');
+    doubles.selectedTool = 'bulldoze';
+    map.toLocal.mockImplementation((global, _container, out) => {
+      out.x = global.x;
+      out.y = global.y;
+      return out;
+    });
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, gridPoint(19, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(20, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(1, gridPoint(21, 10)));
+
+    expect(getTile(city, 20, 10)?.buildingId).toBeUndefined();
+    expect(getTile(city, 21, 10)?.buildingId).toBeUndefined();
+    expect(doubles.metricsPanelInstances[0]?.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ buildingsDemolished: 2 }),
+    );
+    cleanup();
+  });
+
+  it('continues a Bulldoze trace after empty and outside-map tiles while recording only demolitions', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    expect(placeBuilding(city, 20, 10, 'road')).toBe('built');
+    expect(placeBuilding(city, 22, 10, 'road')).toBe('built');
+    const buildingCountBefore = city.buildings.length;
+    doubles.selectedTool = 'bulldoze';
+    map.toLocal.mockImplementation((global, _container, out) => {
+      out.x = global.x;
+      out.y = global.y;
+      return out;
+    });
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, gridPoint(19, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(20, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(30, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(22, 10)));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(1, gridPoint(22, 10)));
+
+    expect(getTile(city, 20, 10)?.buildingId).toBeUndefined();
+    expect(getTile(city, 21, 10)?.buildingId).toBeUndefined();
+    expect(getTile(city, 22, 10)?.buildingId).toBeUndefined();
+    expect(city.buildings).toHaveLength(buildingCountBefore - 2);
+    expect(doubles.metricsPanelInstances[0]?.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ buildingsDemolished: 2 }),
+    );
+    cleanup();
+  });
+
+  it('cancels an active Road trace when a second touch starts', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    map.toLocal.mockImplementation((global, _container, out) => {
+      out.x = global.x;
+      out.y = global.y;
+      return out;
+    });
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, gridPoint(19, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(20, 10)));
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(2, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(2, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(22, 10)));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(1, gridPoint(22, 10)));
+
+    expect(getTile(city, 20, 10)?.buildingId).toBe('road-20-10');
+    expect(getTile(city, 21, 10)?.buildingId).toBeUndefined();
+    expect(getTile(city, 22, 10)?.buildingId).toBeUndefined();
+    expect(doubles.metricsPanelInstances[0]?.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ buildingsConstructed: 1 }),
+    );
+    cleanup();
+  });
+
+  it('cancels an active Bulldoze trace when a second touch starts', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    expect(placeBuilding(city, 20, 10, 'road')).toBe('built');
+    expect(placeBuilding(city, 22, 10, 'road')).toBe('built');
+    doubles.selectedTool = 'bulldoze';
+    map.toLocal.mockImplementation((global, _container, out) => {
+      out.x = global.x;
+      out.y = global.y;
+      return out;
+    });
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, gridPoint(19, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(20, 10)));
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(2, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(2, gridPoint(21, 10)));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, gridPoint(22, 10)));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(1, gridPoint(22, 10)));
+
+    expect(getTile(city, 20, 10)?.buildingId).toBeUndefined();
+    expect(getTile(city, 22, 10)?.buildingId).toBe('road-22-10');
+    expect(doubles.metricsPanelInstances[0]?.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ buildingsDemolished: 1 }),
+    );
+    cleanup();
+  });
+
+  it('pans without building during a one-finger drag with a building tool', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    const buildingCount = city.buildings.length;
+    doubles.selectedTool = 'garden';
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, { x: 100, y: 100 }));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(1, { x: 120, y: 100 }));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(1, { x: 120, y: 100 }));
+
+    expect(city.buildings).toHaveLength(buildingCount);
+    expect(map.toLocal).not.toHaveBeenCalled();
+    expect(map.applyCamera).toHaveBeenLastCalledWith({ x: 120, y: 50, zoom: 0.5 });
+    cleanup();
+  });
+
+  it('pinches around the midpoint without changing city tiles and clears cancelled gestures', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const panel = doubles.buildPanelInstances[0];
+    const map = getMapRendererDouble();
+    if (panel === undefined) throw new Error('Expected build panel.');
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+    const buildingCount = city.buildings.length;
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(1, { x: 100, y: 100 }));
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(2, { x: 110, y: 100 }));
+    doubles.stageHandlers.get('pointermove')?.(touchEvent(2, { x: 120, y: 100 }));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(2, { x: 120, y: 100 }));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(1, { x: 100, y: 100 }));
+
+    expect(city.buildings).toHaveLength(buildingCount);
+    expect(map.toLocal).not.toHaveBeenCalled();
+    expect(map.applyCamera).toHaveBeenLastCalledWith({ x: 90, y: 0, zoom: 1 });
+
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(3, gridPoint(22, 10)));
+    doubles.stageHandlers.get('pointercancel')?.(touchEvent(3, gridPoint(22, 10)));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(3, gridPoint(22, 10)));
+    doubles.stageHandlers.get('pointerdown')?.(touchEvent(4, gridPoint(23, 10)));
+    doubles.stageHandlers.get('pointerupoutside')?.(touchEvent(4, gridPoint(23, 10)));
+    doubles.stageHandlers.get('pointerup')?.(touchEvent(4, gridPoint(23, 10)));
+    expect(city.buildings).toHaveLength(buildingCount);
+    cleanup();
   });
 });

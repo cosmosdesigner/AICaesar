@@ -35,7 +35,7 @@ import { CameraControls } from '../ui/CameraControls';
 import { SaveLoadControls } from '../ui/SaveLoadControls';
 import { getSimulationIntervalMs, type SimulationSpeed } from './SimulationSpeed';
 import { createSessionMetrics, recordSessionMetric, refreshSessionMetrics } from './SessionMetrics';
-
+import { TouchGestureRecognizer, type TouchGestureUpdate } from '../input/TouchGestureRecognizer';
 export async function startGame(host: HTMLElement, panelHost: HTMLElement): Promise<() => void> {
   const ZOOM_STEP = 1.1;
   let selectedScenarioId: ScenarioId = FOUNDING_SETTLEMENT_SCENARIO.id;
@@ -55,6 +55,8 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   let spacePanActive = false;
   let isPanning = false;
   let lastPanPoint: { x: number; y: number } | undefined;
+  const touchGesture = new TouchGestureRecognizer();
+  const tracedTileKeys = new Set<string>();
   let advisor: AdvisorPanel | undefined;
   const textures = await loadMapTextures();
   const app = await createPixiApp(host);
@@ -150,50 +152,11 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   app.stage.eventMode = 'static';
   app.stage.hitArea = app.screen;
   updateCursor();
-  app.stage.on('pointerdown', (event: FederatedPointerEvent) => {
-    if (shouldStartPan(event)) {
-      event.preventDefault();
-      isPanning = true;
-      lastPanPoint = { x: event.global.x, y: event.global.y };
-      updateCursor();
-      return;
-    }
-    if (event.button !== 0) return;
-    if (isScenarioTerminal()) {
-      refreshCity('Construção e demolição bloqueadas: o cenário terminou. Use Reset para recomeçar.');
-      return;
-    }
-    map.toLocal(event.global, undefined, local);
-    const tile = screenToGrid(local.x, local.y);
-    if (panel.selectedTool === 'bulldoze') {
-      const result = tile ? demolishBuilding(city, tile.x, tile.y) : 'outside-map';
-      if (result === 'demolished') {
-        assignWorkers(city);
-        metrics = recordSessionMetric(metrics, 'buildingsDemolished');
-        advisor?.invalidateForCityChange('Advisor plan cleared after demolition.');
-        refreshCity('Edifício demolido.');
-        return;
-      }
-      panel.update(city, demolishMessages[result], waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay, { buildBlocked: isScenarioTerminal() });
-      return;
-    }
-    const result = tile ? placeBuilding(city, tile.x, tile.y, panel.selectedTool) : 'outside-map';
-    if (result === 'built') {
-      assignWorkers(city);
-      metrics = recordSessionMetric(metrics, 'buildingsConstructed');
-      refreshCity(`${BUILD_LABELS[panel.selectedTool]} construído.`);
-      return;
-    }
-    panel.update(city, buildMessages[result], waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay, { buildBlocked: isScenarioTerminal() });
-  });
-  app.stage.on('pointermove', (event: FederatedPointerEvent) => {
-    if (!isPanning || lastPanPoint === undefined) return;
-    const point = { x: event.global.x, y: event.global.y };
-    applyCamera(panCamera(camera, { x: point.x - lastPanPoint.x, y: point.y - lastPanPoint.y }));
-    lastPanPoint = point;
-  });
-  app.stage.on('pointerup', stopPan);
-  app.stage.on('pointerupoutside', stopPan);
+  app.stage.on('pointerdown', handlePointerDown);
+  app.stage.on('pointermove', handlePointerMove);
+  app.stage.on('pointerup', handlePointerUp);
+  app.stage.on('pointerupoutside', handlePointerUpOutside);
+  app.stage.on('pointercancel', handlePointerCancel);
   app.canvas.addEventListener('wheel', handleWheel, { passive: false });
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('keyup', handleKeyUp);
@@ -279,6 +242,131 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
     applyCamera(zoomAtScreenPoint(camera, screenPoint, camera.zoom * multiplier));
   }
 
+  function handlePointerDown(event: FederatedPointerEvent): void {
+    if (event.pointerType === 'touch') {
+      event.preventDefault();
+      touchGesture.pointerDown(event.pointerId, event.global);
+      tracedTileKeys.clear();
+      if (touchGesture.isPinching) stopPan();
+      return;
+    }
+
+    if (shouldStartPan(event)) {
+      event.preventDefault();
+      isPanning = true;
+      lastPanPoint = { x: event.global.x, y: event.global.y };
+      updateCursor();
+      return;
+    }
+    if (event.button !== 0) return;
+    applySingleToolAtPoint(event.global);
+  }
+
+  function handlePointerMove(event: FederatedPointerEvent): void {
+    if (event.pointerType === 'touch') {
+      event.preventDefault();
+      applyTouchGesture(touchGesture.pointerMove(event.pointerId, event.global));
+      return;
+    }
+
+    if (!isPanning || lastPanPoint === undefined) return;
+    const point = { x: event.global.x, y: event.global.y };
+    applyCamera(panCamera(camera, { x: point.x - lastPanPoint.x, y: point.y - lastPanPoint.y }));
+    lastPanPoint = point;
+  }
+
+  function handlePointerUp(event: FederatedPointerEvent): void {
+    if (event.pointerType !== 'touch') {
+      stopPan();
+      return;
+    }
+
+    event.preventDefault();
+    const gesture = touchGesture.pointerUp(event.pointerId, event.global);
+    applyTouchGesture(gesture);
+    if (!touchGesture.isActive) tracedTileKeys.clear();
+  }
+
+  function handlePointerUpOutside(event: FederatedPointerEvent): void {
+    if (event.pointerType !== 'touch') {
+      stopPan();
+      return;
+    }
+
+    event.preventDefault();
+    cancelTouchGesture();
+  }
+
+  function handlePointerCancel(event: FederatedPointerEvent): void {
+    if (event.pointerType !== 'touch') return;
+    event.preventDefault();
+    cancelTouchGesture();
+  }
+  function applyTouchGesture(gesture: TouchGestureUpdate): void {
+    if (gesture.type === 'tap') {
+      applySingleToolAtPoint(gesture.point);
+    } else if (gesture.type === 'pinch') {
+      zoomAt(gesture.midpoint, gesture.scale);
+    } else if (gesture.type === 'drag') {
+      if (panel.selectedTool === 'road' || panel.selectedTool === 'bulldoze') {
+        applyTraceAtPoint(gesture.point);
+      } else {
+        applyCamera(panCamera(camera, gesture.delta));
+      }
+    }
+  }
+
+
+  function cancelTouchGesture(): void {
+    touchGesture.cancel();
+    tracedTileKeys.clear();
+  }
+
+  function applySingleToolAtPoint(screenPoint: { readonly x: number; readonly y: number }): void {
+    if (isScenarioTerminal()) {
+      refreshCity('Construção e demolição bloqueadas: o cenário terminou. Use Reset para recomeçar.');
+      return;
+    }
+    map.toLocal(screenPoint, undefined, local);
+    applyToolAtTile(screenToGrid(local.x, local.y), false);
+  }
+
+  function applyTraceAtPoint(screenPoint: { readonly x: number; readonly y: number }): void {
+    if (isScenarioTerminal()) return;
+    map.toLocal(screenPoint, undefined, local);
+    const tile = screenToGrid(local.x, local.y);
+    if (tile === null) return;
+    const tileKey = `${tile.x}:${tile.y}`;
+    if (tracedTileKeys.has(tileKey)) return;
+    tracedTileKeys.add(tileKey);
+    applyToolAtTile(tile, true);
+  }
+
+  function applyToolAtTile(tile: { readonly x: number; readonly y: number } | null, isTrace: boolean): void {
+    if (panel.selectedTool === 'bulldoze') {
+      const result = tile ? demolishBuilding(city, tile.x, tile.y) : 'outside-map';
+      if (result === 'demolished') {
+        assignWorkers(city);
+        metrics = recordSessionMetric(metrics, 'buildingsDemolished');
+        advisor?.invalidateForCityChange('Advisor plan cleared after demolition.');
+        refreshCity('Edifício demolido.');
+      } else if (!isTrace) {
+        panel.update(city, demolishMessages[result], waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay, { buildBlocked: isScenarioTerminal() });
+      }
+      return;
+    }
+
+    const result = tile ? placeBuilding(city, tile.x, tile.y, panel.selectedTool) : 'outside-map';
+    if (result === 'built') {
+      assignWorkers(city);
+      metrics = recordSessionMetric(metrics, 'buildingsConstructed');
+      advisor?.invalidateForCityChange('Advisor plan cleared after construction.');
+      refreshCity(`${BUILD_LABELS[panel.selectedTool]} construído.`);
+    } else if (!isTrace) {
+      panel.update(city, buildMessages[result], waterOverlay, foodOverlay, desirabilityOverlay, roadNetworkOverlay, { buildBlocked: isScenarioTerminal() });
+    }
+  }
+
   function shouldStartPan(event: FederatedPointerEvent): boolean {
     return event.button === 1 || (event.button === 0 && spacePanActive);
   }
@@ -322,6 +410,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   scheduleTick();
 
   return () => {
+    cancelTouchGesture();
     if (tickHandle !== undefined) window.clearInterval(tickHandle);
     observer.disconnect();
     app.canvas.removeEventListener('wheel', handleWheel);

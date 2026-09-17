@@ -13,7 +13,7 @@ export async function createPixiApp(host: HTMLElement): Promise<Application> {
     autoStart: false,
   });
   app.canvas.setAttribute('role', 'img');
-  app.canvas.setAttribute('aria-label', 'Mapa 30 por 30. Selecione Road, House ou Well e clique num tile vazio para construir.');
+  app.canvas.setAttribute('aria-label', 'Mapa 30 por 30. Toque para construir ou demolir um tile; arraste Road ou Bulldoze para traços, arraste outras ferramentas para mover o mapa e use dois dedos para zoom.');
   host.append(app.canvas);
   return app;
 }
