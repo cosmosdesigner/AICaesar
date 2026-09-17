@@ -111,6 +111,7 @@ describe('AfterActionReport', () => {
     const report = createAfterActionReport({
       before: createSnapshot({ money: 500, housesWithWater: 2, workerShortage: 3, issueCount: 2 }),
       after: createSnapshot({ money: 465, housesWithWater: 3, workerShortage: 0, issueCount: 1 }),
+      plan: createPlan([buildAction('build_well', BUILD_COSTS.well, { x: 3, y: 2 })]),
       executedActions: 1,
       spent: 35,
       remainingIssues: [],
@@ -131,6 +132,7 @@ describe('AfterActionReport', () => {
     const report = createAfterActionReport({
       before: createSnapshot(),
       after: createSnapshot({ issueCount: 4 }),
+      plan: createPlan([buildAction('wait', 0)]),
       executedActions: 0,
       spent: 0,
       remainingIssues: [
@@ -165,6 +167,30 @@ describe('AfterActionReport', () => {
     expect(result.report?.deltas).toContainEqual({ label: 'Money', before: 500, after: 465, delta: -35 });
     expect(result.report?.deltas).toContainEqual({ label: 'Houses with water', before: 0, after: 1, delta: 1 });
     expect(getBuildingAt(city, 3, 2)?.type).toBe('well');
+  });
+
+  it('records strategic promise, exact cost result, and deferred effects', () => {
+    const city = createEmptyCity();
+    const plan: AdvisorPlan = {
+      ...createPlan([buildAction('build_house', BUILD_COSTS.house, { x: 2, y: 2 })]),
+      strategicGoal: 'Advance population toward the scenario target.',
+      expectedImpact: ['Add future housing capacity.'],
+      successCriteria: ['Population reaches 80 after future ticks.'],
+      recommendedBudget: BUILD_COSTS.house,
+    };
+
+    const result = approveAdvisorPlan(city, plan);
+
+    expect(result.report).toMatchObject({
+      spent: BUILD_COSTS.house,
+      promise: {
+        strategicGoal: 'Advance population toward the scenario target.',
+        expectedImpact: ['Add future housing capacity.'],
+        successCriteria: ['Population reaches 80 after future ticks.'],
+        estimatedCost: BUILD_COSTS.house,
+      },
+    });
+    expect(result.report?.futureEffects.join(' ')).toContain('future simulation ticks');
   });
 
   it('adds empty housing without immediately relieving worker shortage after approval', () => {

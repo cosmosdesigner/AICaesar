@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { validatePlan } from '../../actions/ActionExecutor';
-import { analyzeCity, summarizeCity, type CityIssue, type CityStateSummary } from '../../analysis/CityAnalyzer';
-import type { AdvisorPlan } from '../MockAdvisor';
+import { analyzeCity, summarizeCity } from '../../analysis/CityAnalyzer';
+import { getAvailableAdvisorTargets, type AdvisorPlan } from '../MockAdvisor';
 import { validateAdvisorPlanShape, type AdvisorProvider } from '../AdvisorProvider';
 import { LLMAdvisorProvider, buildAdvisorPrompt, type LLMPlanClient } from './LLMAdvisorProvider';
 import { createMockAdvisorProvider } from './MockAdvisorProvider';
 import { createSafeAdvisorProvider } from './SafeAdvisorProvider';
 import { BUILD_COSTS, placeBuilding, type Building, type CityState } from '../../simulation/CityState';
 import type { BuildingType, Tile } from '../../simulation/Tile';
+import { evaluateScenario } from '../../scenario/Scenario';
 
 function createEmptyCity(width = 8, height = 8): CityState {
   const tiles: Tile[] = [];
@@ -40,8 +41,13 @@ function addBuilding(city: CityState, type: BuildingType, x: number, y: number, 
   return building;
 }
 
-function createProviderInput(city: CityState): { readonly summary: CityStateSummary; readonly issues: readonly CityIssue[] } {
-  return { summary: summarizeCity(city), issues: analyzeCity(city) };
+function createProviderInput(city: CityState) {
+  return {
+    summary: summarizeCity(city),
+    issues: analyzeCity(city),
+    scenario: evaluateScenario(city),
+    availableTargets: getAvailableAdvisorTargets(city),
+  };
 }
 
 function createValidPlan(overrides: Partial<AdvisorPlan> = {}): AdvisorPlan {
@@ -77,6 +83,17 @@ describe('Advisor providers', () => {
     expect(result.provider).toBe('mock');
     expect(validateAdvisorPlanShape(result.plan).ok).toBe(true);
     expect(result.plan.actions[0]?.type).toBe('build_well');
+  });
+
+  it('accepts legacy plans and rejects a recommended budget below exact cost', () => {
+    const legacyPlan = createValidPlan();
+    expect(validateAdvisorPlanShape(legacyPlan)).toEqual({ ok: true, plan: legacyPlan });
+
+    const invalidPlan = { ...createValidPlan(), recommendedBudget: -1 };
+    expect(validateAdvisorPlanShape(invalidPlan)).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('recommendedBudget'),
+    });
   });
 
   it('LLM provider accepts valid JSON and prompts only with summary, issues, action types, and schema', async () => {

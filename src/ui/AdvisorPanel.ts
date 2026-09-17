@@ -1,16 +1,17 @@
 import type { AdvisorProvider } from '../advisor/AdvisorProvider';
 import type { AdvisorApprovalResult } from '../advisor/AdvisorApproval';
 import type { AfterActionReport } from '../advisor/AfterActionReport';
-import type { AdvisorPlan } from '../advisor/MockAdvisor';
+import { getAvailableAdvisorTargets, type AdvisorPlan } from '../advisor/MockAdvisor';
 import { createMockAdvisorProvider } from '../advisor/providers/MockAdvisorProvider';
 import { analyzeCity, summarizeCity } from '../analysis/CityAnalyzer';
 import type { CityState } from '../simulation/CityState';
-
+import type { ScenarioProgress } from '../scenario/Scenario';
 
 export interface AdvisorPanelOptions {
   readonly provider?: AdvisorProvider;
   readonly onApprovePlan?: (plan: AdvisorPlan) => AdvisorApprovalResult;
   readonly getScenarioContext?: () => string;
+  readonly getScenarioProgress?: () => ScenarioProgress;
   readonly isApprovalBlocked?: () => boolean;
 }
 
@@ -27,6 +28,10 @@ export class AdvisorPanel {
   private readonly reasoning = document.createElement('ul');
   private readonly actions = document.createElement('ol');
   private readonly estimatedCost = document.createElement('p');
+  private readonly strategicGoal = document.createElement('p');
+  private readonly recommendedBudget = document.createElement('p');
+  private readonly alternatives = document.createElement('ul');
+  private readonly successCriteria = document.createElement('ul');
   private readonly expectedImpact = document.createElement('ul');
   private readonly risks = document.createElement('ul');
   private readonly controls = document.createElement('div');
@@ -37,6 +42,10 @@ export class AdvisorPanel {
   private readonly reportDeltas = document.createElement('ul');
   private readonly reportIssuesLabel = document.createElement('p');
   private readonly reportIssues = document.createElement('ul');
+  private readonly reportPromise = document.createElement('p');
+  private readonly reportExpectedImpact = document.createElement('ul');
+  private readonly reportSuccessCriteria = document.createElement('ul');
+  private readonly reportFutureEffects = document.createElement('ul');
 
   constructor(
     host: HTMLElement,
@@ -112,7 +121,17 @@ export class AdvisorPanel {
     reportTitle.textContent = 'After-action report';
     this.reportSection.className = 'after-action-report';
     this.reportIssuesLabel.className = 'after-action-issues-label';
-    this.reportSection.append(reportTitle, this.reportSummary, this.reportDeltas, this.reportIssuesLabel, this.reportIssues);
+    this.reportSection.append(
+      reportTitle,
+      this.reportSummary,
+      this.reportPromise,
+      this.createSection('Promised impact', this.reportExpectedImpact),
+      this.createSection('Success criteria', this.reportSuccessCriteria),
+      this.createSection('Future effects', this.reportFutureEffects),
+      this.reportDeltas,
+      this.reportIssuesLabel,
+      this.reportIssues,
+    );
 
     this.element.append(
       title,
@@ -123,6 +142,10 @@ export class AdvisorPanel {
       this.createSection('Reasoning', this.reasoning),
       this.createSection('Actions', this.actions),
       this.estimatedCost,
+      this.strategicGoal,
+      this.recommendedBudget,
+      this.createSection('Alternatives and trade-offs', this.alternatives),
+      this.createSection('Success criteria', this.successCriteria),
       this.createSection('Expected impact', this.expectedImpact),
       this.createSection('Risks', this.risks),
       this.controls,
@@ -162,7 +185,13 @@ export class AdvisorPanel {
     this.status.textContent = 'Analyzing...';
 
     const city = this.getCity();
-    const input = { summary: summarizeCity(city), issues: analyzeCity(city) };
+    const scenario = this.options.getScenarioProgress?.();
+    const input = {
+      summary: summarizeCity(city),
+      issues: analyzeCity(city),
+      availableTargets: getAvailableAdvisorTargets(city),
+      ...(scenario === undefined ? {} : { scenario }),
+    };
     const result = await this.advisorProvider.createPlan(input).catch((error: unknown) => ({
       ok: false as const,
       error: error instanceof Error ? error.message : String(error),
@@ -189,6 +218,8 @@ export class AdvisorPanel {
     this.actions.replaceChildren();
     this.expectedImpact.replaceChildren();
     this.risks.replaceChildren();
+    this.alternatives.replaceChildren();
+    this.successCriteria.replaceChildren();
     this.renderReport();
     this.updateScenarioContext();
     this.controls.hidden = this.plan === undefined;
@@ -196,6 +227,8 @@ export class AdvisorPanel {
       this.summary.textContent = 'Click Analyze city to generate an advisor provider plan.';
       this.provider.textContent = '';
       this.estimatedCost.textContent = '';
+      this.strategicGoal.textContent = '';
+      this.recommendedBudget.textContent = '';
       return;
     }
 
@@ -207,6 +240,13 @@ export class AdvisorPanel {
       return `${action.label} — ${action.reason}${target} Cost: ${action.estimatedCost}.`;
     }));
     this.estimatedCost.textContent = `Estimated cost: ${this.plan.estimatedCost}`;
+    this.strategicGoal.textContent = this.plan.strategicGoal ? `Strategic goal: ${this.plan.strategicGoal}` : '';
+    const approvedBudget = this.plan.recommendedBudget ?? this.plan.estimatedCost;
+    this.recommendedBudget.textContent = `Recommended budget: ${this.plan.recommendedBudget ?? this.plan.estimatedCost}. Approved budget: ${approvedBudget}.`;
+    this.renderItems(this.alternatives, (this.plan.alternatives ?? []).map((alternative) => (
+      `${alternative.label}: ${alternative.summary} Trade-offs: ${alternative.tradeOffs.join(' ')}`
+    )));
+    this.renderItems(this.successCriteria, this.plan.successCriteria ?? []);
     this.renderItems(this.expectedImpact, this.plan.expectedImpact);
     this.renderItems(this.risks, this.plan.risks);
   }
@@ -214,11 +254,26 @@ export class AdvisorPanel {
   private renderReport(): void {
     this.reportDeltas.replaceChildren();
     this.reportIssues.replaceChildren();
+    this.reportExpectedImpact.replaceChildren();
+    this.reportSuccessCriteria.replaceChildren();
+    this.reportFutureEffects.replaceChildren();
     this.reportSection.hidden = this.report === undefined;
 
     if (this.report === undefined) return;
 
     this.reportSummary.textContent = `Summary: ${this.report.summary}`;
+    this.reportPromise.textContent = [
+      this.report.promise.strategicGoal ? `Strategic goal: ${this.report.promise.strategicGoal}` : undefined,
+      `Promised cost: ${this.report.promise.estimatedCost}. Actual spent: ${this.report.spent}.`,
+    ].filter((value): value is string => value !== undefined).join(' ');
+    this.renderItems(this.reportExpectedImpact, this.report.promise.expectedImpact);
+    this.renderItems(this.reportSuccessCriteria, this.report.promise.successCriteria);
+    this.renderItems(
+      this.reportFutureEffects,
+      this.report.futureEffects.length === 0
+        ? ['Immediate effects are reflected in the metric deltas below.']
+        : this.report.futureEffects,
+    );
     if (this.report.deltas.length === 0) {
       this.renderItems(this.reportDeltas, ['No tracked metric changes.']);
     } else {

@@ -1,6 +1,7 @@
 import { analyzeCity, type CityIssue } from '../analysis/CityAnalyzer';
 import type { CityState } from '../simulation/CityState';
 import { getFoodStats, getHousingStats, getWorkforceStats } from '../simulation/Simulation';
+import type { AdvisorPlan } from './MockAdvisor';
 
 export interface CityMetricsSnapshot {
   readonly money: number;
@@ -28,17 +29,27 @@ export interface MetricDelta {
   readonly delta: number;
 }
 
+export interface AdvisorPromise {
+  readonly strategicGoal?: string;
+  readonly expectedImpact: readonly string[];
+  readonly successCriteria: readonly string[];
+  readonly estimatedCost: number;
+}
+
 export interface AfterActionReport {
   readonly summary: string;
   readonly executedActions: number;
   readonly spent: number;
   readonly deltas: readonly MetricDelta[];
   readonly remainingIssues: readonly string[];
+  readonly promise: AdvisorPromise;
+  readonly futureEffects: readonly string[];
 }
 
 interface AfterActionReportInput {
   readonly before: CityMetricsSnapshot;
   readonly after: CityMetricsSnapshot;
+  readonly plan: AdvisorPlan;
   readonly executedActions: number;
   readonly spent: number;
   readonly remainingIssues: readonly CityIssue[];
@@ -88,6 +99,14 @@ export function createCityMetricsSnapshot(city: CityState): CityMetricsSnapshot 
 }
 
 export function createAfterActionReport(input: AfterActionReportInput): AfterActionReport {
+  const futureEffects = input.plan.actions.some((action) => (
+    action.type === 'build_house'
+    || action.type === 'build_farm'
+    || action.type === 'build_granary'
+    || action.type === 'build_market'
+  ))
+    ? ['Immigration, food production, distribution, and house evolution are observed only on future simulation ticks.']
+    : [];
   return {
     summary: input.executedActions === 0
       ? 'No build actions executed. City observed.'
@@ -98,6 +117,13 @@ export function createAfterActionReport(input: AfterActionReportInput): AfterAct
     remainingIssues: input.remainingIssues
       .slice(0, 3)
       .map((issue) => `[${issue.severity}] ${issue.explanation}`),
+    promise: {
+      ...(input.plan.strategicGoal === undefined ? {} : { strategicGoal: input.plan.strategicGoal }),
+      expectedImpact: input.plan.expectedImpact,
+      successCriteria: input.plan.successCriteria ?? [],
+      estimatedCost: input.plan.estimatedCost,
+    },
+    futureEffects,
   };
 }
 

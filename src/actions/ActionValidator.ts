@@ -30,6 +30,18 @@ export function validatePlan(city: CityState, plan: AdvisorPlan, approvedBudget:
   let calculatedCost = 0;
   const reservedTiles = new Set<string>();
 
+
+  if (!Number.isInteger(approvedBudget) || approvedBudget < 0) {
+    errors.push('Approved budget must be a non-negative integer.');
+  }
+
+  if (plan.recommendedBudget !== undefined && (
+    !Number.isInteger(plan.recommendedBudget)
+    || plan.recommendedBudget < 0
+    || plan.recommendedBudget < plan.estimatedCost
+  )) {
+    errors.push('Plan recommended budget must be a non-negative integer not lower than its estimated cost.');
+  }
   if (plan.actions.length === 0) {
     errors.push('Plan must contain at least one action.');
   }

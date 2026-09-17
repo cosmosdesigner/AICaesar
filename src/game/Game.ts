@@ -113,6 +113,7 @@ export async function startGame(host: HTMLElement, panelHost: HTMLElement): Prom
   });
   const advisor = new AdvisorPanel(panelHost, () => city, {
     getScenarioContext: () => getScenarioContext(evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO)),
+    getScenarioProgress: () => evaluateScenario(city, FOUNDING_SETTLEMENT_SCENARIO),
     isApprovalBlocked: isScenarioTerminal,
     onApprovePlan: (plan) => {
       if (isScenarioTerminal()) {

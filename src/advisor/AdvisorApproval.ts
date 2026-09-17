@@ -12,7 +12,7 @@ export interface AdvisorApprovalResult {
 
 export function approveAdvisorPlan(city: CityState, plan: AdvisorPlan): AdvisorApprovalResult {
   const before = createCityMetricsSnapshot(city);
-  const result = executePlan(city, plan, plan.estimatedCost);
+  const result = executePlan(city, plan, plan.recommendedBudget ?? plan.estimatedCost);
 
   if (!result.ok) {
     return { ok: false, message: result.message };
@@ -25,6 +25,7 @@ export function approveAdvisorPlan(city: CityState, plan: AdvisorPlan): AdvisorA
     report: createAfterActionReport({
       before,
       after,
+      plan,
       executedActions: result.executedActions,
       spent: result.spent,
       remainingIssues: analyzeCity(city),

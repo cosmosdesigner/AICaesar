@@ -48,7 +48,7 @@ describe('MockAdvisor', () => {
       type: 'build_well',
       estimatedCost: BUILD_COSTS.well,
     });
-    expect(plan.actions[0]?.target).toEqual({ x: 3, y: 2 });
+    expect(plan.actions[0]?.target).toEqual({ x: 2, y: 1 });
     expect(plan.estimatedCost).toBe(plan.actions.reduce((total, action) => total + action.estimatedCost, 0));
   });
 
@@ -79,14 +79,14 @@ describe('MockAdvisor', () => {
   it('creates a wait plan when the city has no issues', () => {
     const plan = createAdvisorPlan(createEmptyCity());
 
-    expect(plan.summary).toBe('City is stable. No critical issues detected.');
-    expect(plan.actions).toEqual([{
-      type: 'wait',
-      label: 'Wait and observe',
-      reason: 'A cidade não tem problemas críticos; observar mais ticks é a ação mais segura.',
-      estimatedCost: 0,
-    }]);
-    expect(plan.estimatedCost).toBe(0);
+    expect(plan.summary).toBe('City is stable, but a small expansion supports the remaining scenario objective.');
+    expect(plan.strategicGoal).toContain('Advance Population');
+    expect(plan.actions[0]).toMatchObject({
+      type: 'build_house',
+      label: 'Build house',
+      estimatedCost: BUILD_COSTS.house,
+    });
+    expect(plan.estimatedCost).toBe(BUILD_COSTS.house);
   });
 
   it('reacts to active events without inventing a new action type', () => {
