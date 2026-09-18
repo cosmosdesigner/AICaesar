@@ -271,10 +271,10 @@ Esses itens podem ser tecnicamente interessantes, mas não resolvem o principal 
 
 ## Próximo passo de execução
 
-A próxima fase concreta deve ser a [Fase 31 — Construir com previsão](phase-31-development-plan.md):
+A Fase 32 validou a decisão de localização com **Mercado na encruzilhada**: uma única construção na posição certa vence o cenário, enquanto uma posição perto do celeiro exige uma segunda construção e recuperação.
 
-- expor a consequência de uma construção antes da confirmação;
-- reutilizar apenas regras determinísticas já existentes;
-- validar que o preview não muta a simulação.
+A próxima fase concreta é a [Fase 33 — Preparar uma crise](phase-33-development-plan.md):
 
-A Fase 32 só avança depois de o preview permitir uma decisão de localização realmente legível.
+- escolher um evento existente com aviso antecipado;
+- introduzir uma preparação com custo e efeito mitigado mensurável;
+- validar preparação, recuperação e save/load com testes headless.

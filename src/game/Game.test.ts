@@ -27,7 +27,7 @@ const doubles = vi.hoisted(() => ({
     setDefinition: Mock;
   }>,
   selectorInstances: [] as Array<{
-    onStart: (selection: { readonly scenarioId: 'founding-settlement' | 'merchant-quarter' | 'resilient-province'; readonly difficulty: 'easy' | 'normal' }) => void;
+    onStart: (selection: { readonly scenarioId: 'founding-settlement' | 'merchant-quarter' | 'planning-crossroads' | 'resilient-province'; readonly difficulty: 'easy' | 'normal' }) => void;
   }>,
   metricsPanelInstances: [] as Array<{
     update: Mock;
@@ -226,7 +226,7 @@ vi.mock('../ui/ScenarioSelector', () => ({
     constructor(
       _host: HTMLElement,
       _selection: unknown,
-      onStart: (selection: { readonly scenarioId: 'founding-settlement' | 'merchant-quarter' | 'resilient-province'; readonly difficulty: 'easy' | 'normal' }) => void,
+      onStart: (selection: { readonly scenarioId: 'founding-settlement' | 'merchant-quarter' | 'planning-crossroads' | 'resilient-province'; readonly difficulty: 'easy' | 'normal' }) => void,
     ) {
       doubles.selectorInstances.push({ onStart });
     }
@@ -591,6 +591,34 @@ describe('startGame camera and cleanup', () => {
       scenarioId: 'merchant-quarter', difficulty: 'easy', buildingsConstructed: 0,
     }));
     expect(map.fitCamera).toHaveBeenCalledTimes(3);
+    cleanup();
+  });
+
+  it('starts the Planning Crossroads scenario with its market placement trade-off', async () => {
+    const cleanup = await startGame(
+      { clientWidth: 800, clientHeight: 600 } as HTMLElement,
+      {} as HTMLElement,
+    );
+    const selector = doubles.selectorInstances[0];
+    const panel = doubles.buildPanelInstances[0];
+    const scenarioPanel = doubles.scenarioPanelInstances[0];
+    const metricsPanel = doubles.metricsPanelInstances[0];
+    if (selector === undefined || panel === undefined || scenarioPanel === undefined || metricsPanel === undefined) {
+      throw new Error('Expected scenario panels.');
+    }
+
+    selector.onStart({ scenarioId: 'planning-crossroads', difficulty: 'normal' });
+    const city = panel.update.mock.lastCall?.[0] as CityState;
+
+    expect(city.resources.money).toBe(200);
+    expect(city.buildings.filter((building) => building.type === 'market')).toHaveLength(0);
+    expect(city.buildings.filter((building) => building.type === 'well')).toHaveLength(2);
+    expect(scenarioPanel.setDefinition).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: 'planning-crossroads', initialMoney: 200, maxTicks: 600, loseBelowMoney: 50,
+    }));
+    expect(metricsPanel.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      scenarioId: 'planning-crossroads', difficulty: 'normal', buildingsConstructed: 0,
+    }));
     cleanup();
   });
 

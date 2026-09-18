@@ -185,13 +185,14 @@ describe('Founding Settlement scenario evaluation', () => {
 });
 
 describe('Phase 25 scenario catalog and difficulty profiles', () => {
-  it('exports exactly three immutable scenarios with distinct ids and briefings', () => {
+  it('exports exactly four immutable scenarios with distinct ids and briefings', () => {
     expect(SCENARIO_CATALOG.map((definition) => definition.id)).toEqual([
       'founding-settlement',
       'merchant-quarter',
+      'planning-crossroads',
       'resilient-province',
     ]);
-    expect(new Set(SCENARIO_CATALOG.map((definition) => definition.briefing)).size).toBe(3);
+    expect(new Set(SCENARIO_CATALOG.map((definition) => definition.briefing)).size).toBe(4);
     expect(Object.isFrozen(SCENARIO_CATALOG)).toBe(true);
 
     for (const definition of SCENARIO_CATALOG) {

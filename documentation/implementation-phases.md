@@ -1089,8 +1089,8 @@ Regra prática:
 
 ## 34. Próximo passo recomendado
 
-As fases 13–30 foram implementadas como base jogável. O roadmap de releases orientado a valor está em [`documentation/next-releases-roadmap.md`](next-releases-roadmap.md).
+As fases 13–32 foram implementadas como base jogável. O roadmap de releases orientado a valor está em [`documentation/next-releases-roadmap.md`](next-releases-roadmap.md).
 
-A próxima fase concreta é a [Fase 31 — Construir com previsão](phase-31-development-plan.md): expor, antes da confirmação, o benefício e o risco de uma construção sem criar regras paralelas nem mutar a simulação.
+A Fase 32 introduziu **Mercado na encruzilhada**: um cenário determinístico em que o mesmo market no tile `(12, 14)` vence com uma construção, enquanto em `(17, 14)` deixa metade das casas sem comida e requer recuperação mais cara.
 
-As Fases 32–34 devem seguir a ordem definida no roadmap: cenário de planeamento, preparação de crise e recuperação/after-action. Não avançar para LLM real, walkers complexos ou mais edifícios antes de validar estas decisões com playtest.
+A próxima fase concreta é a [Fase 33 — Preparar uma crise](phase-33-development-plan.md). Não avançar para LLM real, walkers complexos ou mais edifícios antes de validar estes trade-offs com playtest.

@@ -2,7 +2,7 @@ import type { CityState } from '../simulation/CityState';
 import type { BuildingType } from '../simulation/Tile';
 import { getHousingStats, getWorkforceStats } from '../simulation/Simulation';
 
-export type ScenarioId = 'founding-settlement' | 'merchant-quarter' | 'resilient-province';
+export type ScenarioId = 'founding-settlement' | 'merchant-quarter' | 'planning-crossroads' | 'resilient-province';
 export type DifficultyId = 'easy' | 'normal';
 export type ScenarioStatus = 'active' | 'won' | 'lost';
 export type ScenarioObjectiveId = 'population' | 'water-coverage' | 'food-coverage' | 'worker-shortage' | 'money';
@@ -81,6 +81,13 @@ const merchantSeed = freezeSeed([
   building('well', 6, 14), building('farm', 19, 14), building('granary', 21, 14), building('market', 23, 14),
 ]);
 
+const planningSeed = freezeSeed([
+  ...road(5, 25, 15),
+  house(8, 14), house(10, 14), house(14, 14), house(16, 14),
+  house(8, 16), house(10, 16), house(14, 16), house(16, 16),
+  building('well', 11, 14), building('well', 15, 14), building('farm', 21, 16), building('granary', 19, 14),
+]);
+
 const resilientSeed = freezeSeed([
   ...road(4, 25, 15), ...road(8, 16, 13), ...road(8, 16, 17),
   house(8, 14), house(10, 14), house(12, 14), house(14, 14), house(16, 14),
@@ -122,6 +129,23 @@ export const MERCHANT_QUARTER_SCENARIO: ScenarioDefinition = freezeScenario({
   seed: merchantSeed,
 });
 
+export const PLANNING_CROSSROADS_SCENARIO: ScenarioDefinition = freezeScenario({
+  id: 'planning-crossroads',
+  title: 'Mercado na encruzilhada',
+  briefing: 'Coloque um mercado que alcance todas as casas e fique a oito estradas ou menos do celeiro. Perto demais do celeiro deixa casas sem comida; perto demais das casas não recebe stock.',
+  initialMoney: 200,
+  maxTicks: 600,
+  loseBelowMoney: 50,
+  objectives: [
+    objective('population', 'População', 32, 'at-least'),
+    objective('water-coverage', 'Cobertura de água', 100, 'at-least', 'percent'),
+    objective('food-coverage', 'Cobertura de comida', 100, 'at-least', 'percent'),
+    objective('worker-shortage', 'Falta de trabalhadores', 25, 'at-most', 'percent'),
+    objective('money', 'Tesouro', 100, 'at-least'),
+  ],
+  seed: planningSeed,
+});
+
 export const RESILIENT_PROVINCE_SCENARIO: ScenarioDefinition = freezeScenario({
   id: 'resilient-province',
   title: 'Keep a resilient province',
@@ -142,6 +166,7 @@ export const RESILIENT_PROVINCE_SCENARIO: ScenarioDefinition = freezeScenario({
 export const SCENARIO_CATALOG: readonly ScenarioDefinition[] = Object.freeze([
   FOUNDING_SETTLEMENT_SCENARIO,
   MERCHANT_QUARTER_SCENARIO,
+  PLANNING_CROSSROADS_SCENARIO,
   RESILIENT_PROVINCE_SCENARIO,
 ]);
 
